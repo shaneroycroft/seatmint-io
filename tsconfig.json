@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "@backend/*": ["packages/backend/*"],
+      "@frontend/*": ["packages/frontend/*"],
+      "@contracts/*": ["packages/contracts/*"]
+    }
+  },
+  "include": ["packages/**/*", "*.ts"]
+}
