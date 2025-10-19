@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SeatMint.io</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+  body {
+    margin: 0;
+    background: linear-gradient(180deg, #0D3311 0%, #58855C 60%, #9EB8A0 100%);
+    font-family: 'Press Start 2P', cursive;
+    color: #ADEBB3;
+    overflow: hidden;
+    height: 100vh;
+  }
+
+  header {
+    background: #0D3311;
+    color: #ADEBB3;
+    padding: 10px;
+    border-bottom: 2px solid #58855C;
+    text-align: center;
+    text-shadow: 1px 1px #000;
+  }
+
+  header h1 {
+    font-size: 1.3rem;
+    margin: 0;
+  }
+
+  .desktop {
+    position: relative;
+    height: calc(100vh - 50px);
+    background: repeating-linear-gradient(
+      45deg,
+      rgba(173, 235, 179, 0.05),
+      rgba(173, 235, 179, 0.05) 20px,
+      rgba(13, 51, 17, 0.05) 20px,
+      rgba(13, 51, 17, 0.05) 40px
+    );
+  }
+
+  .window {
+    position: absolute;
+    top: 80px;
+    left: 80px;
+    width: 420px;
+    background: #0D3311;
+    border: 3px solid #58855C;
+    box-shadow: 5px 5px 0 #9EB8A0;
+    color: #ADEBB3;
+  }
+
+  .title-bar {
+    background: #58855C;
+    padding: 5px;
+    cursor: move;
+    color: #0D3311;
+    font-size: 0.7rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .title-bar .buttons {
+    display: flex;
+    gap: 4px;
+  }
+
+  .title-bar .btn {
+    width: 10px;
+    height: 10px;
+    background: #ADEBB3;
+    border: 1px solid #0D3311;
+  }
+
+  .content {
+    padding: 15px;
+    font-size: 0.7rem;
+  }
+
+  input, select {
+    width: 95%;
+    background: #0D3311;
+    border: 2px solid #9EB8A0;
+    color: #ADEBB3;
+    font-family: 'Press Start 2P', cursive;
+    font-size: 0.6rem;
+    padding: 6px;
+    margin: 5px 0;
+  }
+
+  .button {
+    display: inline-block;
+    background: #58855C;
+    border: 2px solid #9EB8A0;
+    color: #0D3311;
+    padding: 8px 16px;
+    text-decoration: none;
+    font-size: 0.6rem;
+    margin-top: 10px;
+    transition: all 0.2s;
+  }
+
+  .button:hover {
+    background: #ADEBB3;
+    color: #0D3311;
+  }
+
+  footer {
+    text-align: center;
+    padding: 10px;
+    font-size: 0.6rem;
+    background: #0D3311;
+    border-top: 2px solid #58855C;
+    color: #9EB8A0;
+  }
+
+  /* Retro scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #58855C;
+    border-radius: 0;
+  }
+  ::-webkit-scrollbar-track {
+    background: #0D3311;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>SeatMint.io</h1>
+  <p>Mint Your Events the Retro Way 🚀</p>
+</header>
+
+<div class="desktop">
+  <div class="window" id="mintWindow">
+    <div class="title-bar">
+      <span>SeatMint</span>
+      <div class="buttons">
+        <div class="btn"></div>
+        <div class="btn"></div>
+        <div class="btn"></div>
+      </div>
+    </div>
+    <div class="content">
+      <form>
+        <input type="text" placeholder="Wallet Address">
+        <input type="text" placeholder="Event Name">
+        <select>
+          <option value="">Ticket Type</option>
+          <option>VIP</option>
+          <option>General</option>
+          <option>Early Bird</option>
+        </select>
+        <br>
+        <a href="#" class="button">Mint Ticket</a>
+      </form>
+    </div>
+  </div>
+
+  <div class="window" id="playerWindow" style="top:220px; left:540px;">
+    <div class="title-bar">
+      <span>SeatMint Player</span>
+      <div class="buttons">
+        <div class="btn"></div>
+        <div class="btn"></div>
+        <div class="btn"></div>
+      </div>
+    </div>
+    <div class="content">
+      🎵 <b>Now Playing:</b> Deja Entendu<br>
+      <progress value="40" max="100" style="width:95%; height:8px;"></progress><br>
+      <a href="#" class="button">▶ Play</a>
+      <a href="#" class="button">⏸ Pause</a>
+    </div>
+  </div>
+</div>
+
+<footer>
+  &copy; 2025 SeatMint.io — 💾
+</footer>
+
+<script>
+  // Drag window functionality
+  const windows = document.querySelectorAll('.window');
+  windows.forEach(win => {
+    const bar = win.querySelector('.title-bar');
+    let offsetX, offsetY, isDown = false;
+
+    bar.addEventListener('mousedown', e => {
+      isDown = true;
+      offsetX = e.clientX - win.offsetLeft;
+      offsetY = e.clientY - win.offsetTop;
+      win.style.zIndex = 1000;
+    });
+
+    document.addEventListener('mouseup', () => isDown = false);
+
+    document.addEventListener('mousemove', e => {
+      if (!isDown) return;
+      win.style.left = (e.clientX - offsetX) + 'px';
+      win.style.top = (e.clientY - offsetY) + 'px';
+    });
+  });
+</script>
+
+</body>
+</html>
