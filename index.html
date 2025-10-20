@@ -1,214 +1,371 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SeatMint.io</title>
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SeatMint.io - Web3 Ticket Finder</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        /* General Reset and Font */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #C0C0C0; /* Windows 95/98 desktop gray */
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: #000;
+        }
 
-  body {
-    margin: 0;
-    background: linear-gradient(180deg, #0D3311 0%, #58855C 60%, #9EB8A0 100%);
-    font-family: 'Press Start 2P', cursive;
-    color: #ADEBB3;
-    overflow: hidden;
-    height: 100vh;
-  }
+        /* Main Window Styling - Desktop Default */
+        .window {
+            background-color: #ECECEC; /* Dialog background color */
+            border: 2px solid;
+            border-color: #fff #6D6D6D #6D6D6D #fff;
+            padding: 2px;
+            width: 95%;
+            max-width: 900px;
+            height: 80vh;
+            box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.2);
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+        }
 
-  header {
-    background: #0D3311;
-    color: #ADEBB3;
-    padding: 10px;
-    border-bottom: 2px solid #58855C;
-    text-align: center;
-    text-shadow: 1px 1px #000;
-  }
+        /* Title Bar */
+        .title-bar {
+            background-color: #000080; /* Classic dark blue */
+            color: white;
+            padding: 4px 8px;
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2px;
+            user-select: none;
+        }
 
-  header h1 {
-    font-size: 1.3rem;
-    margin: 0;
-  }
+        .title-bar-controls button {
+            background-color: #C0C0C0;
+            border: 2px solid;
+            border-color: #fff #000 #000 #fff;
+            padding: 0 4px;
+            font-size: 12px;
+            line-height: 1;
+            margin-left: 2px;
+            cursor: pointer;
+            width: 16px;
+            height: 16px;
+        }
 
-  .desktop {
-    position: relative;
-    height: calc(100vh - 50px);
-    background: repeating-linear-gradient(
-      45deg,
-      rgba(173, 235, 179, 0.05),
-      rgba(173, 235, 179, 0.05) 20px,
-      rgba(13, 51, 17, 0.05) 20px,
-      rgba(13, 51, 17, 0.05) 40px
-    );
-  }
+        /* Toolbar (Busy Icons) */
+        .toolbar {
+            background-color: #C0C0C0;
+            border-bottom: 2px solid #6D6D6D;
+            padding: 4px;
+            display: flex;
+            gap: 6px;
+        }
 
-  .window {
-    position: absolute;
-    top: 80px;
-    left: 80px;
-    width: 420px;
-    background: #0D3311;
-    border: 3px solid #58855C;
-    box-shadow: 5px 5px 0 #9EB8A0;
-    color: #ADEBB3;
-  }
+        /* Embossed 3D Button Style */
+        .toolbar button, .search-area button {
+            background-color: #C0C0C0;
+            border: 2px solid;
+            border-color: #fff #000 #000 #fff;
+            padding: 4px 8px;
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            user-select: none;
+            white-space: nowrap; /* Prevent button text wrapping */
+        }
 
-  .title-bar {
-    background: #58855C;
-    padding: 5px;
-    cursor: move;
-    color: #0D3311;
-    font-size: 0.7rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
+        /* Button Press Effect */
+        .toolbar button:active, .search-area button:active {
+            border-color: #000 #fff #fff #000;
+            box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.3);
+            transform: translate(1px, 1px);
+        }
 
-  .title-bar .buttons {
-    display: flex;
-    gap: 4px;
-  }
+        /* Content Area */
+        .content {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            overflow: hidden;
+        }
 
-  .title-bar .btn {
-    width: 10px;
-    height: 10px;
-    background: #ADEBB3;
-    border: 1px solid #0D3311;
-  }
+        /* Tabs */
+        .tabs {
+            display: flex;
+            margin-top: 4px;
+            padding-left: 4px;
+            user-select: none;
+            overflow-x: auto; /* Allow horizontal scroll if tabs overflow */
+        }
 
-  .content {
-    padding: 15px;
-    font-size: 0.7rem;
-  }
+        .tab {
+            background-color: #C0C0C0;
+            border: 2px solid;
+            border-color: #fff #6D6D6D #C0C0C0 #fff;
+            padding: 4px 10px;
+            margin-right: 2px;
+            border-bottom: none;
+            cursor: pointer;
+            white-space: nowrap;
+        }
 
-  input, select {
-    width: 95%;
-    background: #0D3311;
-    border: 2px solid #9EB8A0;
-    color: #ADEBB3;
-    font-family: 'Press Start 2P', cursive;
-    font-size: 0.6rem;
-    padding: 6px;
-    margin: 5px 0;
-  }
+        .tab.active {
+            background-color: #ECECEC;
+            border-color: #fff #6D6D6D #ECECEC #fff;
+            position: relative;
+            top: 2px; /* Lift active tab slightly */
+            margin-bottom: -2px; /* Overlap border */
+            z-index: 10;
+        }
 
-  .button {
-    display: inline-block;
-    background: #58855C;
-    border: 2px solid #9EB8A0;
-    color: #0D3311;
-    padding: 8px 16px;
-    text-decoration: none;
-    font-size: 0.6rem;
-    margin-top: 10px;
-    transition: all 0.2s;
-  }
+        /* Main Panel (holds search bar and list) */
+        .main-panel {
+            background-color: #ECECEC;
+            flex-grow: 1;
+            border: 2px solid;
+            border-color: #6D6D6D #fff #fff #6D6D6D; /* Inset border for content area */
+            padding: 8px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
 
-  .button:hover {
-    background: #ADEBB3;
-    color: #0D3311;
-  }
+        .search-area {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
 
-  footer {
-    text-align: center;
-    padding: 10px;
-    font-size: 0.6rem;
-    background: #0D3311;
-    border-top: 2px solid #58855C;
-    color: #9EB8A0;
-  }
+        .search-area input[type="text"] {
+            flex-grow: 1;
+            padding: 4px;
+            border: 1px solid #000;
+            box-shadow: inset 1px 1px 0 #6D6D6D, 1px 1px 0 #fff;
+            box-sizing: border-box;
+            background-color: white;
+            font-size: 13px;
+        }
 
-  /* Retro scrollbar */
-  ::-webkit-scrollbar {
-    width: 8px;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: #58855C;
-    border-radius: 0;
-  }
-  ::-webkit-scrollbar-track {
-    background: #0D3311;
-  }
-</style>
+        /* Data List/Table Styling (Dense Information Display) */
+        .data-list {
+            flex-grow: 1;
+            border: 1px solid #000;
+            box-shadow: inset 1px 1px 0 #6D6D6D;
+            overflow: auto;
+            background-color: white;
+            font-size: 11px;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        
+        /* Desktop/Default Column Widths */
+        .data-table th:nth-child(1), .data-table td:nth-child(1) { width: 30%; } /* Event Name */
+        .data-table th:nth-child(2), .data-table td:nth-child(2) { width: 25%; } /* Artist */
+        .data-table th:nth-child(3), .data-table td:nth-child(3) { width: 10%; } /* Price (ADA) */
+        .data-table th:nth-child(4), .data-table td:nth-child(4) { width: 10%; } /* Category */
+        .data-table th:nth-child(5), .data-table td:nth-child(5) { width: 10%; } /* Resale */
+        .data-table th:nth-child(6), .data-table td:nth-child(6) { width: 15%; } /* Seller */
+
+
+        .data-table th {
+            background-color: #C0C0C0;
+            border: 1px solid;
+            border-color: #fff #6D6D6D #6D6D6D #fff;
+            padding: 2px 4px;
+            text-align: left;
+            cursor: pointer;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .data-table td {
+            padding: 2px 4px;
+            border-bottom: 1px solid #E0E0E0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .data-table tr:hover {
+            background-color: #B4B4CC; /* Slight hover to mimic selection */
+        }
+
+        /* Status Bar */
+        .status-bar {
+            background-color: #C0C0C0;
+            border-top: 2px solid #fff;
+            border-bottom: 2px solid #6D6D6D;
+            padding: 2px;
+            font-size: 11px;
+            display: flex;
+            justify-content: space-between;
+            margin-top: 2px;
+        }
+
+        .status-pane {
+            border: 1px solid;
+            border-color: #6D6D6D #fff #fff #6D6D6D; /* Inset effect */
+            padding: 0 4px;
+            margin-right: 2px;
+            white-space: nowrap;
+        }
+        
+        /* Utility for Icons (using simple text/symbols for the retro look) */
+        .icon {
+            font-size: 12px;
+            line-height: 1;
+        }
+
+        /* Responsive adjustments for smaller screens (Mobile) */
+        @media (max-width: 600px) {
+            body {
+                align-items: flex-start; /* Align window to top edge */
+            }
+            .window {
+                width: 100%; /* Take full width */
+                height: 100vh; /* Take full height */
+                max-width: none;
+                box-shadow: none; /* Remove shadow on full-screen mobile view */
+                border: none; /* Remove window border on full-screen mobile view */
+            }
+            .toolbar {
+                flex-wrap: wrap;
+                justify-content: flex-start;
+            }
+            .toolbar button {
+                padding: 3px 6px;
+                margin-bottom: 4px; /* Space out wrapped buttons */
+            }
+            .search-area {
+                flex-direction: column;
+            }
+            .data-table th, .data-table td {
+                padding: 1px 2px;
+            }
+            
+            /* HIDE less essential columns for mobile readability */
+            /* 3: Price, 5: Resale, 6: Seller */
+            .data-table th:nth-child(3), .data-table td:nth-child(3),
+            .data-table th:nth-child(5), .data-table td:nth-child(5),
+            .data-table th:nth-child(6), .data-table td:nth-child(6) {
+                display: none;
+            }
+
+            /* ADJUST widths for remaining columns (1: Event Name, 2: Artist, 4: Category) */
+            .data-table th:nth-child(1), .data-table td:nth-child(1) { width: 50%; }
+            .data-table th:nth-child(2), .data-table td:nth-child(2) { width: 30%; }
+            .data-table th:nth-child(4), .data-table td:nth-child(4) { width: 20%; }
+            
+            .status-bar {
+                flex-wrap: wrap;
+                justify-content: flex-start;
+                padding-bottom: 4px;
+            }
+        }
+    </style>
 </head>
 <body>
 
-<header>
-  <h1>SeatMint.io</h1>
-  <p>Mint Your Events the Retro Way 🚀</p>
-</header>
+    <div class="window">
+        <div class="title-bar">
+            <span>SeatMint.io - Secure Ticket Marketplace</span>
+            <div class="title-bar-controls">
+                <button title="Minimize">_</button>
+                <button title="Maximize">□</button>
+                <button title="Close">x</button>
+            </div>
+        </div>
 
-<div class="desktop">
-  <div class="window" id="mintWindow">
-    <div class="title-bar">
-      <span>SeatMint</span>
-      <div class="buttons">
-        <div class="btn"></div>
-        <div class="btn"></div>
-        <div class="btn"></div>
-      </div>
+        <div class="toolbar">
+            <button><span class="icon">🔗</span> Connect Wallet</button>
+            <button><span class="icon">🔍</span> Find Events</button>
+            <button><span class="icon">🎟️</span> My Tickets</button>
+            <button><span class="icon">📈</span> My Listings</button>
+            <button><span class="icon">⚙︎</span> Settings</button>
+            <button><span class="icon">❓</span> Help</button>
+        </div>
+
+        <div class="content">
+            <div class="tabs">
+                <div class="tab active" data-tab="search">Event Search</div>
+                <div class="tab" data-tab="transfers">My Tickets</div>
+                <div class="tab" data-tab="library">Watchlist</div>
+                <div class="tab" data-tab="chat">Community</div>
+            </div>
+            <div class="main-panel">
+                <div class="search-area">
+                    <input type="text" placeholder="Enter Artist, Event, or Venue (e.g., 'Indie Music Fest')">
+                    <button>Search</button>
+                </div>
+                <div class="data-list">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Event Name</th>
+                                <th>Artist/Performer</th>
+                                <th>Price (ADA)</th>
+                                <th>Category</th>
+                                <th>Resale</th>
+                                <th>Seller</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Indie Music Fest 2025</td><td>Various Artists</td><td>0.05</td><td>Music</td><td>Yes</td><td>wallet_0x123...</td></tr>
+                            <tr><td>Web3 Innovators Summit</td><td>Tech Leaders</td><td>0.12</td><td>Conference</td><td>No</td><td>official_venue</td></tr>
+                            <tr><td>Cosmic Beats EDM</td><td>DJ Stardust</td><td>0.08</td><td>Music</td><td>Yes</td><td>wallet_0xabc...</td></tr>
+                            <tr><td>Digital Dreams Art Gala</td><td>Digital Artists</td><td>0.25</td><td>Art</td><td>No</td><td>gallery_vault</td></tr>
+                            <tr><td>City Marathon 2025</td><td>Community</td><td>0.02</td><td>Sports</td><td>Yes</td><td>wallet_0xdef...</td></tr>
+                            <tr><td>The Blockchain Play</td><td>The Crypto Players</td><td>0.04</td><td>Theater</td><td>Yes</td><td>wallet_0x456...</td></tr>
+                            <tr><td>Standup Comedy Night</td><td>Ada Haha</td><td>0.03</td><td>Comedy</td><td>No</td><td>the_comedy_club</td></tr>
+                            <tr><td>Food & Wine Expo</td><td>Gourmet Chefs</td><td>0.10</td><td>Lifestyle</td><td>Yes</td><td>wallet_0x789...</td></tr>
+                            <tr><td>E-Sports Championship</td><td>Pro Gamers</td><td>0.06</td><td>Gaming</td><td>Yes</td><td>esports_arena</td></tr>
+                            <tr><td>Classic Rock Revival</td><td>The Rolling Tones</td><td>0.09</td><td>Music</td><td>Yes</td><td>wallet_0xghi...</td></tr>
+                            <tr><td>Developer Meetup</td><td>Web3 Devs</td><td>Free</td><td>Tech</td><td>No</td><td>community_host</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-pane">Status: Connected (Mainnet)</div>
+            <div class="status-pane">Listings Found: 3,452</div>
+            <div class="status-pane">Avg. Price: 0.08 ADA</div>
+        </div>
     </div>
-    <div class="content">
-      <form>
-        <input type="text" placeholder="Wallet Address">
-        <input type="text" placeholder="Event Name">
-        <select>
-          <option value="">Ticket Type</option>
-          <option>VIP</option>
-          <option>General</option>
-          <option>Early Bird</option>
-        </select>
-        <br>
-        <a href="#" class="button">Mint Ticket</a>
-      </form>
-    </div>
-  </div>
 
-  <div class="window" id="playerWindow" style="top:220px; left:540px;">
-    <div class="title-bar">
-      <span>SeatMint Player</span>
-      <div class="buttons">
-        <div class="btn"></div>
-        <div class="btn"></div>
-        <div class="btn"></div>
-      </div>
-    </div>
-    <div class="content">
-      🎵 <b>Now Playing:</b> Deja Entendu<br>
-      <progress value="40" max="100" style="width:95%; height:8px;"></progress><br>
-      <a href="#" class="button">▶ Play</a>
-      <a href="#" class="button">⏸ Pause</a>
-    </div>
-  </div>
-</div>
-
-<footer>
-  &copy; 2025 SeatMint.io — 💾
-</footer>
-
-<script>
-  // Drag window functionality
-  const windows = document.querySelectorAll('.window');
-  windows.forEach(win => {
-    const bar = win.querySelector('.title-bar');
-    let offsetX, offsetY, isDown = false;
-
-    bar.addEventListener('mousedown', e => {
-      isDown = true;
-      offsetX = e.clientX - win.offsetLeft;
-      offsetY = e.clientY - win.offsetTop;
-      win.style.zIndex = 1000;
-    });
-
-    document.addEventListener('mouseup', () => isDown = false);
-
-    document.addEventListener('mousemove', e => {
-      if (!isDown) return;
-      win.style.left = (e.clientX - offsetX) + 'px';
-      win.style.top = (e.clientY - offsetY) + 'px';
-    });
-  });
-</script>
+    <script>
+        // Simple JS to handle tab switching for demonstration
+        const tabs = document.querySelectorAll('.tab');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Remove active class from all tabs
+                tabs.forEach(t => t.classList.remove('active'));
+                // Add active class to clicked tab
+                tab.classList.add('active');
+                
+                // (In a real app, this would switch the content of the main-panel)
+                console.log(`Switched to tab: ${tab.textContent.trim()}`);
+            });
+        });
+    </script>
 
 </body>
 </html>
+
