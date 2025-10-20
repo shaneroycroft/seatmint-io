@@ -23,5 +23,9 @@
     "globals": "^15.9.0",
     "prettier": "^3.2.5",
     "typescript": "^5.5.4"
+  },
+  "dependencies": {
+    "@blockfrost/blockfrost-js": "^6.0.0",
+    "lucid": "link:@minswap/lucid-cardano/lucid"
   }
 }
