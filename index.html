@@ -71,7 +71,7 @@
         }
 
         /* Embossed 3D Button Style */
-        .toolbar button, .search-area button {
+        .toolbar button, .sidebar-search-button {
             background-color: #C0C0C0;
             border: 2px solid;
             border-color: #fff #000 #000 #fff;
@@ -86,27 +86,76 @@
         }
 
         /* Button Press Effect */
-        .toolbar button:active, .search-area button:active {
+        .toolbar button:active, .sidebar-search-button:active {
             border-color: #000 #fff #fff #000;
             box-shadow: inset 1px 1px 0 rgba(0, 0, 0, 0.3);
             transform: translate(1px, 1px);
         }
 
-        /* Content Area */
+        /* --- Two-Column Layout for Content --- */
         .content {
+            display: flex; /* Enable side-by-side */
+            flex-grow: 1;
+            overflow: hidden;
+            padding: 4px; /* Add slight padding around the two columns */
+            gap: 4px; /* Space between sidebar and main view */
+        }
+
+        /* 1. Left Sidebar (Filters) */
+        .sidebar {
+            width: 200px; /* Fixed width for filters */
+            background-color: #ECECEC;
+            border: 2px solid;
+            border-color: #6D6D6D #fff #fff #6D6D6D; /* Inset border for the panel */
+            padding: 8px;
             display: flex;
             flex-direction: column;
-            flex-grow: 1;
+            overflow-y: auto; /* Scrollable filter area */
+            box-sizing: border-box;
+            flex-shrink: 0; /* Prevents sidebar from shrinking */
+        }
+
+        .filter-group {
+            margin-bottom: 8px;
+        }
+
+        .filter-group label {
+            font-size: 11px;
+            font-weight: 600;
+            margin-bottom: 2px;
+            display: block;
+        }
+
+        .filter-group input, .filter-group select {
+            width: 100%;
+            padding: 3px;
+            border: 1px solid #000;
+            box-shadow: inset 1px 1px 0 #6D6D6D, 1px 1px 0 #fff;
+            box-sizing: border-box;
+            background-color: white;
+            font-size: 13px;
+        }
+
+        .sidebar-search-button {
+            margin-top: 10px;
+            align-self: flex-start;
+        }
+
+        /* 2. Right Main Content Area (Tabs + List) */
+        .main-content-right {
+            flex-grow: 1; /* Takes up remaining space */
+            display: flex;
+            flex-direction: column;
             overflow: hidden;
         }
 
-        /* Tabs */
+        /* Tabs (Styles remain the same) */
         .tabs {
             display: flex;
-            margin-top: 4px;
-            padding-left: 4px;
+            margin-top: 0; /* Remove top margin, handled by main .content padding */
+            padding-left: 0;
             user-select: none;
-            overflow-x: auto; /* Allow horizontal scroll if tabs overflow */
+            overflow-x: auto;
         }
 
         .tab {
@@ -124,13 +173,13 @@
             background-color: #ECECEC;
             border-color: #fff #6D6D6D #ECECEC #fff;
             position: relative;
-            top: 2px; /* Lift active tab slightly */
-            margin-bottom: -2px; /* Overlap border */
+            top: 2px;
+            margin-bottom: -2px;
             z-index: 10;
         }
 
-        /* Main Panel (holds search bar and list) */
-        .main-panel {
+        /* Main Panel (holds data list) */
+        .data-view-panel {
             background-color: #ECECEC;
             flex-grow: 1;
             border: 2px solid;
@@ -140,21 +189,10 @@
             display: flex;
             flex-direction: column;
         }
-
+        
+        /* Hide the old horizontal search area */
         .search-area {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 8px;
-        }
-
-        .search-area input[type="text"] {
-            flex-grow: 1;
-            padding: 4px;
-            border: 1px solid #000;
-            box-shadow: inset 1px 1px 0 #6D6D6D, 1px 1px 0 #fff;
-            box-sizing: border-box;
-            background-color: white;
-            font-size: 13px;
+            display: none;
         }
 
         /* Data List/Table Styling (Dense Information Display) */
@@ -173,7 +211,7 @@
             table-layout: fixed;
         }
         
-        /* Desktop/Default Column Widths */
+        /* Desktop/Default Column Widths (Adjusted for wider view) */
         .data-table th:nth-child(1), .data-table td:nth-child(1) { width: 30%; } /* Event Name */
         .data-table th:nth-child(2), .data-table td:nth-child(2) { width: 25%; } /* Artist */
         .data-table th:nth-child(3), .data-table td:nth-child(3) { width: 10%; } /* Price (ADA) */
@@ -235,14 +273,14 @@
         /* Responsive adjustments for smaller screens (Mobile) */
         @media (max-width: 600px) {
             body {
-                align-items: flex-start; /* Align window to top edge */
+                align-items: flex-start;
             }
             .window {
-                width: 100%; /* Take full width */
-                height: 100vh; /* Take full height */
+                width: 100%;
+                height: 100vh;
                 max-width: none;
-                box-shadow: none; /* Remove shadow on full-screen mobile view */
-                border: none; /* Remove window border on full-screen mobile view */
+                box-shadow: none;
+                border: none;
             }
             .toolbar {
                 flex-wrap: wrap;
@@ -250,24 +288,37 @@
             }
             .toolbar button {
                 padding: 3px 6px;
-                margin-bottom: 4px; /* Space out wrapped buttons */
+                margin-bottom: 4px;
             }
-            .search-area {
-                flex-direction: column;
+            
+            /* Stack columns on mobile */
+            .content {
+                flex-direction: column; 
+                padding: 0;
+                gap: 0;
             }
+
+            /* Sidebar full width on mobile */
+            .sidebar {
+                width: 100%;
+                border-width: 0 0 2px 0;
+                border-color: #6D6D6D;
+                padding: 8px;
+            }
+            
+            /* Data table column adjustments for mobile */
             .data-table th, .data-table td {
                 padding: 1px 2px;
             }
             
             /* HIDE less essential columns for mobile readability */
-            /* 3: Price, 5: Resale, 6: Seller */
-            .data-table th:nth-child(3), .data-table td:nth-child(3),
-            .data-table th:nth-child(5), .data-table td:nth-child(5),
-            .data-table th:nth-child(6), .data-table td:nth-child(6) {
+            .data-table th:nth-child(3), .data-table td:nth-child(3), /* Price */
+            .data-table th:nth-child(5), .data-table td:nth-child(5), /* Resale */
+            .data-table th:nth-child(6), .data-table td:nth-child(6) { /* Seller */
                 display: none;
             }
 
-            /* ADJUST widths for remaining columns (1: Event Name, 2: Artist, 4: Category) */
+            /* ADJUST widths for remaining columns */
             .data-table th:nth-child(1), .data-table td:nth-child(1) { width: 50%; }
             .data-table th:nth-child(2), .data-table td:nth-child(2) { width: 30%; }
             .data-table th:nth-child(4), .data-table td:nth-child(4) { width: 20%; }
@@ -301,47 +352,96 @@
             <button><span class="icon">❓</span> Help</button>
         </div>
 
+        <!-- NEW Two-Column Content Area -->
         <div class="content">
-            <div class="tabs">
-                <div class="tab active" data-tab="search">Event Search</div>
-                <div class="tab" data-tab="transfers">My Tickets</div>
-                <div class="tab" data-tab="library">Watchlist</div>
-                <div class="tab" data-tab="chat">Community</div>
-            </div>
-            <div class="main-panel">
-                <div class="search-area">
-                    <input type="text" placeholder="Enter Artist, Event, or Venue (e.g., 'Indie Music Fest')">
-                    <button>Search</button>
+
+            <!-- LEFT SIDEBAR: Filters (New Pane based on LimeWire) -->
+            <div class="sidebar">
+                <div class="filter-group">
+                    <label for="filter-event">Event Name</label>
+                    <input type="text" id="filter-event" placeholder="e.g., 'Music Fest 2025'">
                 </div>
-                <div class="data-list">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Event Name</th>
-                                <th>Artist/Performer</th>
-                                <th>Price (ADA)</th>
-                                <th>Category</th>
-                                <th>Resale</th>
-                                <th>Seller</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr><td>Indie Music Fest 2025</td><td>Various Artists</td><td>0.05</td><td>Music</td><td>Yes</td><td>wallet_0x123...</td></tr>
-                            <tr><td>Web3 Innovators Summit</td><td>Tech Leaders</td><td>0.12</td><td>Conference</td><td>No</td><td>official_venue</td></tr>
-                            <tr><td>Cosmic Beats EDM</td><td>DJ Stardust</td><td>0.08</td><td>Music</td><td>Yes</td><td>wallet_0xabc...</td></tr>
-                            <tr><td>Digital Dreams Art Gala</td><td>Digital Artists</td><td>0.25</td><td>Art</td><td>No</td><td>gallery_vault</td></tr>
-                            <tr><td>City Marathon 2025</td><td>Community</td><td>0.02</td><td>Sports</td><td>Yes</td><td>wallet_0xdef...</td></tr>
-                            <tr><td>The Blockchain Play</td><td>The Crypto Players</td><td>0.04</td><td>Theater</td><td>Yes</td><td>wallet_0x456...</td></tr>
-                            <tr><td>Standup Comedy Night</td><td>Ada Haha</td><td>0.03</td><td>Comedy</td><td>No</td><td>the_comedy_club</td></tr>
-                            <tr><td>Food & Wine Expo</td><td>Gourmet Chefs</td><td>0.10</td><td>Lifestyle</td><td>Yes</td><td>wallet_0x789...</td></tr>
-                            <tr><td>E-Sports Championship</td><td>Pro Gamers</td><td>0.06</td><td>Gaming</td><td>Yes</td><td>esports_arena</td></tr>
-                            <tr><td>Classic Rock Revival</td><td>The Rolling Tones</td><td>0.09</td><td>Music</td><td>Yes</td><td>wallet_0xghi...</td></tr>
-                            <tr><td>Developer Meetup</td><td>Web3 Devs</td><td>Free</td><td>Tech</td><td>No</td><td>community_host</td></tr>
-                        </tbody>
-                    </table>
+                
+                <div class="filter-group">
+                    <label for="filter-location">Location</label>
+                    <input type="text" id="filter-location" placeholder="e.g., 'Miami' or 'Europe'">
+                </div>
+
+                <div class="filter-group">
+                    <label for="filter-date">Date & Time</label>
+                    <select id="filter-date">
+                        <option value="">-- Any Date --</option>
+                        <option value="today">Today</option>
+                        <option value="weekend">This Weekend</option>
+                        <option value="next30">Next 30 Days</option>
+                        <option value="next90">Next 90 Days</option>
+                        <option value="custom">Custom Range...</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label for="filter-category">Category</label>
+                    <select id="filter-category">
+                        <option value="">-- All Categories --</option>
+                        <option value="music">Music</option>
+                        <option value="sports">Sports</option>
+                        <option value="conference">Conferences</option>
+                        <option value="arts">Arts & Theatre</option>
+                        <option value="gaming">Gaming/Esports</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label for="filter-price">Max Price (ADA)</label>
+                    <input type="number" id="filter-price" placeholder="e.g., 0.50" min="0" step="0.01">
+                </div>
+
+                <button class="sidebar-search-button"><span class="icon">🔎</span> Search</button>
+            </div>
+
+            <!-- RIGHT MAIN CONTENT: Tabs and Results List -->
+            <div class="main-content-right">
+                
+                <div class="tabs">
+                    <div class="tab active" data-tab="search">Event Search</div>
+                    <div class="tab" data-tab="transfers">My Tickets</div>
+                    <div class="tab" data-tab="library">Watchlist</div>
+                    <div class="tab" data-tab="chat">Community</div>
+                </div>
+
+                <div class="data-view-panel">
+                    <!-- The old search-area is now hidden via CSS -->
+                    <div class="data-list">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Event Name</th>
+                                    <th>Artist/Performer</th>
+                                    <th>Price (ADA)</th>
+                                    <th>Category</th>
+                                    <th>Resale</th>
+                                    <th>Seller</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td>Tomorrowland</td><td>Various Artists</td><td>0.05</td><td>Music</td><td>Yes</td><td>wallet_0x123...</td></tr>
+                                <tr><td>Osheaga</td><td>Tech Leaders</td><td>0.12</td><td>Conference</td><td>No</td><td>official_venue</td></tr>
+                                <tr><td>Mettalica</td><td>DJ Stardust</td><td>0.08</td><td>Music</td><td>Yes</td><td>wallet_0xabc...</td></tr>
+                                <tr><td>Digital Dreams Art Gala</td><td>Digital Artists</td><td>0.25</td><td>Art</td><td>No</td><td>gallery_vault</td></tr>
+                                <tr><td>City Marathon 2025</td><td>Community</td><td>0.02</td><td>Sports</td><td>Yes</td><td>wallet_0xdef...</td></tr>
+                                <tr><td>The Blockchain Play</td><td>The Crypto Players</td><td>0.04</td><td>Theater</td><td>Yes</td><td>wallet_0x456...</td></tr>
+                                <tr><td>Standup Comedy Night</td><td>Ada Haha</td><td>0.03</td><td>Comedy</td><td>No</td><td>the_comedy_club</td></tr>
+                                <tr><td>Food & Wine Expo</td><td>Gourmet Chefs</td><td>0.10</td><td>Lifestyle</td><td>Yes</td><td>wallet_0x789...</td></tr>
+                                <tr><td>E-Sports Championship</td><td>Pro Gamers</td><td>0.06</td><td>Gaming</td><td>Yes</td><td>esports_arena</td></tr>
+                                <tr><td>Classic Rock Revival</td><td>The Rolling Tones</td><td>0.09</td><td>Music</td><td>Yes</td><td>wallet_0xghi...</td></tr>
+                                <tr><td>Developer Meetup</td><td>Web3 Devs</td><td>Free</td><td>Tech</td><td>No</td><td>community_host</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
+        <!-- END NEW Two-Column Content Area -->
 
         <div class="status-bar">
             <div class="status-pane">Status: Connected (Mainnet)</div>
@@ -360,7 +460,7 @@
                 // Add active class to clicked tab
                 tab.classList.add('active');
                 
-                // (In a real app, this would switch the content of the main-panel)
+                // (In a real app, this would switch the content of the data-view-panel)
                 console.log(`Switched to tab: ${tab.textContent.trim()}`);
             });
         });
@@ -368,4 +468,3 @@
 
 </body>
 </html>
-

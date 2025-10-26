@@ -1,171 +1,117 @@
-# build_primary_sale.py
-from dataclasses import dataclass
-from typing import Any, Optional, Tuple
 from opshin.prelude import *
-
-# --- Data Classes ---
-
-@dataclass
-class EventDatum(PlutusData):
-    organizer: PubKeyHash
-    event_id: bytes
-    event_name: bytes
-    total_tickets: int
-    ticket_price: int
-    royalty_percentage: int
 
 @dataclass
 class TicketDatum(PlutusData):
+    CONSTR_ID = 1
     event_id: bytes
     ticket_id: bytes
     owner: PubKeyHash
     price: int
-    is_for_resale: int  # 0 = primary sale, non-zero = resale
-    royalty_address: PubKeyHash
-    royalty_amount: int
 
 @dataclass
 class BuyRedeemer(PlutusData):
+    CONSTR_ID = 2
     action: bytes
     buyer: PubKeyHash
-    offered_price: int  # buyer-specified payment amount
 
-# --- Helpers ---
+def validator(ctx: ScriptContext) -> None:
+    # 3. Validator Signature: Using ctx: ScriptContext as the sole parameter.
 
-def extract_lovelace(value: Any) -> int:
-    """
-    Safely extract lovelace amount from Opshin value shapes.
-    Handles:
-      - ints (some versions may represent lovelace directly)
-      - nested mapping with b"" as lovelace key e.g. { b"": 1_000_000 }
-      - unexpected shapes (return 0)
-    """
-    # Direct integer
-    if isinstance(value, int):
-        return value
+    # 6. Context Access: Validate purpose is Spending
+    purpose = ctx.purpose
+    assert isinstance(purpose, Spending), "Script purpose must be Spending"
+    spending_purpose: Spending = purpose # 4. Type Annotations
+    own_tx_out_ref = spending_purpose.tx_out_ref
 
-    # Mapping-like value (commonly a dict)
-    # Avoid using built-in type names as variable identifiers
-    if isinstance(value, dict):
-        lovelace_inner = value.get(b"")
-        if isinstance(lovelace_inner, int):
-            return lovelace_inner
-        if lovelace_inner is not None:
-            try:
-                return int(lovelace_inner)
-            except Exception:
-                return 0
+    # Find own input
+    tx_inputs = [ 
+        tx_in for tx_in in ctx.transaction.inputs
+        if tx_in.out_ref.id == own_tx_out_ref.id and tx_in.out_ref.idx == own_tx_out_ref.idx
+    ]
+    assert len(tx_inputs) == 1, "Exactly one input must match spending purpose"
+    own_input: TxInInfo = tx_inputs[0] # 4. Type Annotations
 
-    return 0
+    # Extract script address from own input
+    script_address: Address = own_input.resolved.address # 4. Type Annotations
 
-def find_own_input(tx_inputs: list, script_address: bytes) -> Optional[Any]:
-    """Return the first input resolved at the script's own address."""
-    for tx_in in tx_inputs:
-        if tx_in.resolved.address == script_address:
-            return tx_in
-    return None
+    # Extract input datum
+    input_datum_data: Datum = own_input.resolved.datum # 4. Type Annotations
+    assert input_datum_data is not None, "Input datum missing"
+    
+    # DEBUG: The compiler rejects isinstance(Datum, Dataclass). We must check CONSTR_ID directly if we don't know the exact PlutusData type.
+    # 2. Dataclass Definition & 8. Error Handling: Use CONSTR_ID check on Datum object.
+    # We assert the CONSTR_ID matches the expected value (1) for TicketDatum.
+    assert input_datum_data.CONSTR_ID == 1, "Input datum has incorrect constructor ID"
+    ticket_datum_in: TicketDatum = cast(TicketDatum, input_datum_data) # Use cast after check
+    
+    # Validate redeemer
+    redeemer_data: Datum = ctx.redeemer # 4. Type Annotations
+    
+    # DEBUG: The compiler rejects isinstance(Datum, Dataclass). We must check CONSTR_ID directly.
+    # 2. Dataclass Definition & 8. Error Handling: Use CONSTR_ID check on Datum object.
+    assert redeemer_data.CONSTR_ID == 2, "Redeemer has incorrect constructor ID" # Assuming BuyRedeemer is CONSTR_ID = 2
+    buy_redeemer: BuyRedeemer = cast(BuyRedeemer, redeemer_data) # Use cast after check
+    assert buy_redeemer.action == b"buy", "Invalid redeemer action"
+    
+    # 6. Context Access: Access signatories
+    assert buy_redeemer.buyer in ctx.transaction.signatories, "Buyer signature missing"
 
-def find_nft_in_value(value: Any) -> Optional[Tuple[bytes, bytes]]:
-    """
-    Attempt to find a policy_id and token_name for an NFT (amount == 1)
-    in the provided value structure. Returns (policy_id, token_name) or None.
-    """
-    if not isinstance(value, dict):
-        return None
+    # Extract NFT from input value
+    # 4. Type Annotations: Explicitly annotating value type.
+    value: Dict[bytes, Dict[bytes, int]] = own_input.resolved.value
+    
+    # 7. Deterministic Logic: List comprehension for NFT candidates
+    nft_candidates = [
+        [pid, tname]
+        for pid, tokens in value.items() if pid != b""
+        for tname, amt in tokens.items() if amt == 1
+    ]
+    
+    assert len(nft_candidates) == 1, "Exactly one NFT with amount 1 must be present in input"
+    policy_id: bytes = nft_candidates[0][0] 
+    token_name: bytes = nft_candidates[0][1] 
 
-    for policy_id, token_map in value.items():
-        if policy_id == b"":  # skip ADA
-            continue
-        if not isinstance(token_map, dict):
-            continue
-        for token_name, amount in token_map.items():
-            try:
-                if int(amount) == 1:
-                    return (policy_id, token_name)
-            except Exception:
-                continue
-    return None
+    # Find output with NFT at script address
+    tx_outputs = [ 
+        out for out in ctx.transaction.outputs
+        if out.address == script_address and out.value.get(policy_id, {}).get(token_name, 0) == 1
+    ]
+    assert len(tx_outputs) == 1, "Exactly one output must contain the NFT at script address"
+    output: TxOut = tx_outputs[0] # 4. Type Annotations
+    
+    # Extract output datum
+    output_datum_data: Datum = output.datum # 4. Type Annotations
+    assert output_datum_data is not None, "Output datum missing"
+    
+    # DEBUG: The compiler rejects isinstance(Datum, Dataclass). We must check CONSTR_ID directly.
+    # 2. Dataclass Definition & 8. Error Handling: Use CONSTR_ID check on Datum object.
+    assert output_datum_data.CONSTR_ID == 1, "Output datum has incorrect constructor ID"
+    ticket_datum_out: TicketDatum = cast(TicketDatum, output_datum_data) # Use cast after check
 
-# --- Validator ---
-
-def validator(context: ScriptContext) -> None:
-    # Redeemer validation
-    redeemer_obj = context.redeemer
-    assert isinstance(redeemer_obj, BuyRedeemer), "Redeemer must be BuyRedeemer"
-    assert redeemer_obj.action == b"buy", "Invalid redeemer action"
-    assert redeemer_obj.buyer in context.transaction.signatories, "Buyer signature missing"
-
-    # Input datum (safe)
-    input_datum_opt = own_datum(context)
-    assert input_datum_opt is not None, "Input datum missing"
-    input_datum = TicketDatum.from_primitive(input_datum_opt)
-
-    # Find script's own input UTXO
-    own_input = find_own_input(context.transaction.inputs, context.own_address)
-    assert own_input is not None, "No input found at script"
-
-    # Extract NFT identifiers from the own input value
-    nft_ident = find_nft_in_value(own_input.resolved.value)
-    assert nft_ident is not None, "No NFT found in script input"
-    policy_id, token_name = nft_ident
-
-    # Find the output that keeps the NFT at script (ownership must move in datum)
-    output_datum_obj: Optional[TicketDatum] = None
-    for out in context.transaction.outputs:
-        # check if NFT still present in this output
-        token_count = 0
-        if isinstance(out.value, dict):
-            token_count = out.value.get(policy_id, {}).get(token_name, 0)
-        if token_count == 1 and out.address == context.own_address:
-            assert out.datum is not None, "Output datum missing on NFT output"
-            output_datum_obj = TicketDatum.from_primitive(out.datum)
-            break
-    assert output_datum_obj is not None, "No valid output with NFT found at script"
-
-    # Ownership updates and invariants
-    assert output_datum_obj.owner == redeemer_obj.buyer, "Output datum owner not updated to buyer"
-    assert output_datum_obj.event_id == input_datum.event_id, "Event ID mismatch"
-    assert output_datum_obj.ticket_id == input_datum.ticket_id, "Ticket ID mismatch"
-    # After purchase, ticket should no longer be flagged for resale
-    assert output_datum_obj.is_for_resale == 0, "Ticket must leave script as non-resale after purchase"
+    # 8. Error Handling: Validate output datum state changes
+    assert ticket_datum_out.owner == buy_redeemer.buyer, "Output datum owner not updated to buyer"
+    assert ticket_datum_out.event_id == ticket_datum_in.event_id, "Event ID mismatch"
+    assert ticket_datum_out.ticket_id == ticket_datum_in.ticket_id, "Ticket ID mismatch"
+    assert ticket_datum_out.price == ticket_datum_in.price, "Price mismatch" 
 
     # Payment verification
-    payment_verified = False
-
-    # Primary sale path
-    if input_datum.is_for_resale == 0:
-        required_amount = int(input_datum.price)
-        for out in context.transaction.outputs:
-            if out.address == input_datum.owner:
-                lovelace_amt = extract_lovelace(out.value.get(b"", 0))
-                if lovelace_amt >= required_amount:
-                    payment_verified = True
-                    break
-
-    # Resale path (royalty enforced)
-    else:
-        # buyer pays offered_price; royalty_amount must be sent to royalty_address,
-        # and remainder to current owner.
-        offered = int(redeemer_obj.offered_price)
-        royalty_needed = int(input_datum.royalty_amount)
-        owner_expected_min = offered - royalty_needed
-        owner_payment_ok = False
-        royalty_payment_ok = False
-
-        for out in context.transaction.outputs:
-            if out.address == input_datum.owner:
-                lovelace_amt = extract_lovelace(out.value.get(b"", 0))
-                if lovelace_amt >= owner_expected_min:
-                    owner_payment_ok = True
-            if out.address == input_datum.royalty_address:
-                lovelace_amt = extract_lovelace(out.value.get(b"", 0))
-                if lovelace_amt >= royalty_needed:
-                    royalty_payment_ok = True
-
-        payment_verified = owner_payment_ok and royalty_payment_ok
-
-    assert payment_verified, "Payment to owner/royalty missing or insufficient"
-
-# Expose the entrypoint expected by Opshin
-# Many Opshin examples expect variables named `validator` to be present; which we have above.
-# If your Opshin toolchain expects a different export name (e.g., mk_validator), adapt accordingly.
+    payment_verified: bool = False # 4. Type Annotations
+    required_amount: int = ticket_datum_in.price # 4. Type Annotations
+    
+    expected_pkh: PubKeyHash = ticket_datum_in.owner
+    
+    for out in ctx.transaction.outputs:
+        out_value: Dict[bytes, Dict[bytes, int]] = out.value
+        
+        # Check if the output is a PubKeyCredential and the hash matches the owner
+        if isinstance(out.address.credential, PubKeyCredential) and out.address.credential.pubkeyhash == expected_pkh:
+            # Safe access for Lovelace (policy_id=b"")
+            ada_map: Dict[bytes, int] = out_value.get(b"", {})
+            lovelace: int = ada_map.get(b"", 0)
+            
+            if lovelace >= required_amount:
+                payment_verified = True
+                break
+                
+    # 8. Error Handling
+    assert payment_verified, "Payment to owner missing or insufficient"
