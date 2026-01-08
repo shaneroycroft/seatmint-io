@@ -1,0 +1,419 @@
+{
+  "preamble": {
+    "title": "seatmint/contracts",
+    "description": "Aiken contracts for project 'seatmint/contracts'",
+    "version": "0.0.0",
+    "plutusVersion": "v3",
+    "compiler": {
+      "name": "Aiken",
+      "version": "v1.1.21+42babe5"
+    },
+    "license": "Apache-2.0"
+  },
+  "validators": [
+    {
+      "title": "event_mint.seatmint_event.mint",
+      "redeemer": {
+        "title": "redeemer",
+        "schema": {
+          "$ref": "#/definitions/seatmint~1types~1MintAction"
+        }
+      },
+      "parameters": [
+        {
+          "title": "organizer_pkh",
+          "schema": {
+            "$ref": "#/definitions/aiken~1crypto~1VerificationKeyHash"
+          }
+        },
+        {
+          "title": "settings_token",
+          "schema": {
+            "$ref": "#/definitions/cardano~1assets~1PolicyId"
+          }
+        }
+      ],
+      "compiledCode": "5904ec0101002229800aba2aba1aba0aab9faab9eaab9dab9a9bae0039bae00248888888896600264653001300a00198051805800cdc3a4001300a0024888966002600460146ea800e266446644b300130060018acc004c03cdd5004400a2c80822b300130030018acc004c03cdd5004400a2c80822c806900d0999119912cc004c020c040dd500144c8c96600266e1d2004301237540031323322598009806980a9baa00389919191919194c004dd7180f800cdd6980f8034dd6980f8024dd6980f801cc966002603a00315980099b8948010c0700062d13011301c001406d1640786ea8c07c0092222259800981280344c966002603260426ea80062646464b3001302900289980818140018992cc004c074006264b3001302b001899192cc004c080006264b3001302e00189980a981680080b45902b18149baa0028acc004c07400626464653001375a605e003375a605e007375a605e0049112cc004c0cc0120371640c0302f001302e0013029375400516409c8138c09cdd50009815000c5902818131baa0028acc004c0680062b3001302637540050128b204e8b2048409060486ea80062c8130c09c004c09c004c088dd5000c5902018120054590220c07c004c078004c074004c070004c06c004c058dd5001c590140992cc004c030c050dd500744c8c96600200f15980099b88480000062b3001300b30163754603460360051337120026eb4c018c05cdd50024528202a8a50405514a080a8dd6980c800994c004006660106eacc008c058dd5006005d2f5c30100008103d87a8000200222259800801440062653001004980e801ccc88cc074dd419b80375a603c0080026603b3001598009807980d1baa301e301f0048acc004cdc7cc0052000a401d0025c612201064576656e742d0089807800c52820328a5040654c0103d87a8000a60103d8798000406497ae0375c60300026eb4c064005004180d80120328acc0040162653001001998041bab3002301637540180174a280088896600200510018994c004012603a0073259800801c4cdc41bad301a0024800229410181bae30180014010603600480ca294101320262301830193019301930190012232598009807000c4c8c966002603a0050048b2034375c6036002602e6ea800e2b3001300b001899192cc004c07400a0091640686eb8c06c004c05cdd5001c59015202a30153754004602c60266ea80062c8088c004c048dd5180298091baa3015301237540064602a602c602c00316403c64660020026eb0c00cc040dd5003112cc0040062980103d87a80008992cc004c018c8cc88cc008008004896600200300389919912cc004cdc8a4410853657474696e6773000028acc004cdc7a4410853657474696e6773000028800c01901644cc014014c0700110161bae3015001375a602c002603000280b0cc014dd5980318099baa30063013375400401e2900044cdd2a40006602800297ae0899801801980b00120203014001404864660020026eb0c04cc050c050c050c050c050c050c050c050c040dd5003112cc00400629422b30013371e6eb8c05000403a2946266004004602a002807901211808980900091191919800800802112cc00400600713233225980099b910070028acc004cdc78038014400600c809a26600a00a60320088098dd718090009bab30130013015001404c297adef6c60300c375400c6eb8c038c02cdd50019b874800a2c80486014002600a6ea802a29344d95900301",
+      "hash": "1110e40909cc1e9e1d0ab0763a94fbbb8c1e8fee566588e862bd38d9"
+    },
+    {
+      "title": "event_mint.seatmint_event.else",
+      "redeemer": {
+        "schema": {}
+      },
+      "parameters": [
+        {
+          "title": "organizer_pkh",
+          "schema": {
+            "$ref": "#/definitions/aiken~1crypto~1VerificationKeyHash"
+          }
+        },
+        {
+          "title": "settings_token",
+          "schema": {
+            "$ref": "#/definitions/cardano~1assets~1PolicyId"
+          }
+        }
+      ],
+      "compiledCode": "5904ec0101002229800aba2aba1aba0aab9faab9eaab9dab9a9bae0039bae00248888888896600264653001300a00198051805800cdc3a4001300a0024888966002600460146ea800e266446644b300130060018acc004c03cdd5004400a2c80822b300130030018acc004c03cdd5004400a2c80822c806900d0999119912cc004c020c040dd500144c8c96600266e1d2004301237540031323322598009806980a9baa00389919191919194c004dd7180f800cdd6980f8034dd6980f8024dd6980f801cc966002603a00315980099b8948010c0700062d13011301c001406d1640786ea8c07c0092222259800981280344c966002603260426ea80062646464b3001302900289980818140018992cc004c074006264b3001302b001899192cc004c080006264b3001302e00189980a981680080b45902b18149baa0028acc004c07400626464653001375a605e003375a605e007375a605e0049112cc004c0cc0120371640c0302f001302e0013029375400516409c8138c09cdd50009815000c5902818131baa0028acc004c0680062b3001302637540050128b204e8b2048409060486ea80062c8130c09c004c09c004c088dd5000c5902018120054590220c07c004c078004c074004c070004c06c004c058dd5001c590140992cc004c030c050dd500744c8c96600200f15980099b88480000062b3001300b30163754603460360051337120026eb4c018c05cdd50024528202a8a50405514a080a8dd6980c800994c004006660106eacc008c058dd5006005d2f5c30100008103d87a8000200222259800801440062653001004980e801ccc88cc074dd419b80375a603c0080026603b3001598009807980d1baa301e301f0048acc004cdc7cc0052000a401d0025c612201064576656e742d0089807800c52820328a5040654c0103d87a8000a60103d8798000406497ae0375c60300026eb4c064005004180d80120328acc0040162653001001998041bab3002301637540180174a280088896600200510018994c004012603a0073259800801c4cdc41bad301a0024800229410181bae30180014010603600480ca294101320262301830193019301930190012232598009807000c4c8c966002603a0050048b2034375c6036002602e6ea800e2b3001300b001899192cc004c07400a0091640686eb8c06c004c05cdd5001c59015202a30153754004602c60266ea80062c8088c004c048dd5180298091baa3015301237540064602a602c602c00316403c64660020026eb0c00cc040dd5003112cc0040062980103d87a80008992cc004c018c8cc88cc008008004896600200300389919912cc004cdc8a4410853657474696e6773000028acc004cdc7a4410853657474696e6773000028800c01901644cc014014c0700110161bae3015001375a602c002603000280b0cc014dd5980318099baa30063013375400401e2900044cdd2a40006602800297ae0899801801980b00120203014001404864660020026eb0c04cc050c050c050c050c050c050c050c050c040dd5003112cc00400629422b30013371e6eb8c05000403a2946266004004602a002807901211808980900091191919800800802112cc00400600713233225980099b910070028acc004cdc78038014400600c809a26600a00a60320088098dd718090009bab30130013015001404c297adef6c60300c375400c6eb8c038c02cdd50019b874800a2c80486014002600a6ea802a29344d95900301",
+      "hash": "1110e40909cc1e9e1d0ab0763a94fbbb8c1e8fee566588e862bd38d9"
+    },
+    {
+      "title": "settings.settings.spend",
+      "datum": {
+        "title": "_datum",
+        "schema": {
+          "$ref": "#/definitions/seatmint~1types~1GlobalSettings"
+        }
+      },
+      "redeemer": {
+        "title": "_redeemer",
+        "schema": {
+          "$ref": "#/definitions/Data"
+        }
+      },
+      "parameters": [
+        {
+          "title": "admin_pkh",
+          "schema": {
+            "$ref": "#/definitions/aiken~1crypto~1VerificationKeyHash"
+          }
+        }
+      ],
+      "compiledCode": "589f010100229800aba2aba1aab9faab9eaab9dab9a9bae002488888896600264646644b30013370e900118039baa0018994c004c02c006601660180032259800800c528456600266e3cdd718068008044528c4cc008008c03800500920184888cc004004dd618071807980798079807980798079807980798061baa300e00818041baa0018b200c300800130083009001300800130043754011149a26cac80101",
+      "hash": "fdefae317c4a7764a6f39a83e9c35638147e4e7b6c2fbce32f3ec161"
+    },
+    {
+      "title": "settings.settings.else",
+      "redeemer": {
+        "schema": {}
+      },
+      "parameters": [
+        {
+          "title": "admin_pkh",
+          "schema": {
+            "$ref": "#/definitions/aiken~1crypto~1VerificationKeyHash"
+          }
+        }
+      ],
+      "compiledCode": "589f010100229800aba2aba1aab9faab9eaab9dab9a9bae002488888896600264646644b30013370e900118039baa0018994c004c02c006601660180032259800800c528456600266e3cdd718068008044528c4cc008008c03800500920184888cc004004dd618071807980798079807980798079807980798061baa300e00818041baa0018b200c300800130083009001300800130043754011149a26cac80101",
+      "hash": "fdefae317c4a7764a6f39a83e9c35638147e4e7b6c2fbce32f3ec161"
+    },
+    {
+      "title": "storefront.storefront.spend",
+      "datum": {
+        "title": "datum_opt",
+        "schema": {
+          "$ref": "#/definitions/seatmint~1types~1TicketDatum"
+        }
+      },
+      "redeemer": {
+        "title": "redeemer",
+        "schema": {
+          "$ref": "#/definitions/seatmint~1types~1StorefrontAction"
+        }
+      },
+      "parameters": [
+        {
+          "title": "settings_token",
+          "schema": {
+            "$ref": "#/definitions/cardano~1assets~1PolicyId"
+          }
+        }
+      ],
+      "compiledCode": "59057b010100229800aba2aba1aba0aab9faab9eaab9dab9a9bae0024888888896600264653001300900198049805000cdc3a400530090024888966002600460126ea800e26466453001159800980098061baa0028999119912cc004c014c040dd500144c8c96600266e1d2004301237540031323322598009805180a9baa00389919191919194c004dd7180f800cdd6980f8034dd6980f8024dd6980f801cc966002603a00315980099b8948010c0700062d13015301c001406d1640786ea8c07c0092222259800981280344c966002602c60426ea80062646464b3001302900289980818140018992cc004c068006264b3001302b001899192cc004c074006264b3001302e00189980a981680080b45902b18149baa0028acc004c08400626464653001375a605e003375a605e007375a605e0049112cc004c0cc0120371640c0302f001302e0013029375400516409c8138c09cdd50009815000c5902818131baa0028acc004c0780062b3001302637540050128b204e8b2048409060486ea80062c8130c09c004c09c004c088dd5000c5902018120054590220c07c004c078004c074004c070004c06c004c058dd5001c590140acc004c020c04cdd500744c966002b3001300d301437546002602a6ea800a2946330014a34a14a2809901344c96600266e24dd6980c980b1baa0063370666e08dd69801180b1baa006375a6002602c6ea800d20c8018cc004cdc199b82375a6032602c6ea8018dd6980c980b1baa003483403e66e0ccdc11bad30193016375400c6eb4c004c058dd5003241a01f29800800d22100a4410040292232330010010032259800800c52845660026006603a00314a3133002002301e001406080d922223259800998011bac300a301b37540244b30013375e603e60386ea8004c038c070dd500644cdc480118021bab300e301c375400314a080d22b3001330023758601460366ea804896600266ebcc07cc070dd50009805980e1baa00c899b8900530043756601c60386ea8006294101a44cc008dd61805180d9baa01225980099baf301f301c3754002601c60386ea8026266e24018c010dd59807180e1baa0018a50406914a080ca294101919b81337026eb4c074c068dd5005002001a2c80a08c064c068c068c0680062c80988c060c064c064c064c064006264b300130093014375400313232330010013758603460366036603660366036603660366036602e6ea8038896600200314a115980099b8f375c603600200714a3133002002301c001405880c8dd7180c180a9baa0018b2026301730143754600c60286ea801101211192cc004c02c00626464b3001301d00280245901a1bae301b001301737540071598009807800c4c8c966002603a0050048b2034375c6036002602e6ea800e2c80a9015180a9baa002301630133754003164044600260246ea8c010c048dd5180a98091baa00323015301630160018b201e32330010013758600460206ea801c896600200314c0103d87a80008992cc004c02a60026eacc010c048dd5180218091baa001807d2210853657474696e677300401513374a90001980a000a5eb82266006006602c0048080c050005012180918079baa004222323322330020020012259800800c00e2646644b30013372200e00515980099b8f0070028800c01901444cc014014c0680110141bae3013001375a6028002602c00280a0c8c8cc004004018896600200300389919912cc004cdc8804801456600266e3c02400a20030064055133005005301b00440546eb8c050004dd5980a800980b800a02a14bd6f7b6300a400046022602400316402d300c375400f3010003488966002600800515980098081baa00a801c590114566002601000515980098081baa00a801c5901145900e201c180718078009b8748000c028dd5001c590080c024004c010dd5004c52689b2b20041",
+      "hash": "e2a08971cacfbf946adb07ee868ae0a1f689b805370d9702d5980a64"
+    },
+    {
+      "title": "storefront.storefront.else",
+      "redeemer": {
+        "schema": {}
+      },
+      "parameters": [
+        {
+          "title": "settings_token",
+          "schema": {
+            "$ref": "#/definitions/cardano~1assets~1PolicyId"
+          }
+        }
+      ],
+      "compiledCode": "59057b010100229800aba2aba1aba0aab9faab9eaab9dab9a9bae0024888888896600264653001300900198049805000cdc3a400530090024888966002600460126ea800e26466453001159800980098061baa0028999119912cc004c014c040dd500144c8c96600266e1d2004301237540031323322598009805180a9baa00389919191919194c004dd7180f800cdd6980f8034dd6980f8024dd6980f801cc966002603a00315980099b8948010c0700062d13015301c001406d1640786ea8c07c0092222259800981280344c966002602c60426ea80062646464b3001302900289980818140018992cc004c068006264b3001302b001899192cc004c074006264b3001302e00189980a981680080b45902b18149baa0028acc004c08400626464653001375a605e003375a605e007375a605e0049112cc004c0cc0120371640c0302f001302e0013029375400516409c8138c09cdd50009815000c5902818131baa0028acc004c0780062b3001302637540050128b204e8b2048409060486ea80062c8130c09c004c09c004c088dd5000c5902018120054590220c07c004c078004c074004c070004c06c004c058dd5001c590140acc004c020c04cdd500744c966002b3001300d301437546002602a6ea800a2946330014a34a14a2809901344c96600266e24dd6980c980b1baa0063370666e08dd69801180b1baa006375a6002602c6ea800d20c8018cc004cdc199b82375a6032602c6ea8018dd6980c980b1baa003483403e66e0ccdc11bad30193016375400c6eb4c004c058dd5003241a01f29800800d22100a4410040292232330010010032259800800c52845660026006603a00314a3133002002301e001406080d922223259800998011bac300a301b37540244b30013375e603e60386ea8004c038c070dd500644cdc480118021bab300e301c375400314a080d22b3001330023758601460366ea804896600266ebcc07cc070dd50009805980e1baa00c899b8900530043756601c60386ea8006294101a44cc008dd61805180d9baa01225980099baf301f301c3754002601c60386ea8026266e24018c010dd59807180e1baa0018a50406914a080ca294101919b81337026eb4c074c068dd5005002001a2c80a08c064c068c068c0680062c80988c060c064c064c064c064006264b300130093014375400313232330010013758603460366036603660366036603660366036602e6ea8038896600200314a115980099b8f375c603600200714a3133002002301c001405880c8dd7180c180a9baa0018b2026301730143754600c60286ea801101211192cc004c02c00626464b3001301d00280245901a1bae301b001301737540071598009807800c4c8c966002603a0050048b2034375c6036002602e6ea800e2c80a9015180a9baa002301630133754003164044600260246ea8c010c048dd5180a98091baa00323015301630160018b201e32330010013758600460206ea801c896600200314c0103d87a80008992cc004c02a60026eacc010c048dd5180218091baa001807d2210853657474696e677300401513374a90001980a000a5eb82266006006602c0048080c050005012180918079baa004222323322330020020012259800800c00e2646644b30013372200e00515980099b8f0070028800c01901444cc014014c0680110141bae3013001375a6028002602c00280a0c8c8cc004004018896600200300389919912cc004cdc8804801456600266e3c02400a20030064055133005005301b00440546eb8c050004dd5980a800980b800a02a14bd6f7b6300a400046022602400316402d300c375400f3010003488966002600800515980098081baa00a801c590114566002601000515980098081baa00a801c5901145900e201c180718078009b8748000c028dd5001c590080c024004c010dd5004c52689b2b20041",
+      "hash": "e2a08971cacfbf946adb07ee868ae0a1f689b805370d9702d5980a64"
+    }
+  ],
+  "definitions": {
+    "Bool": {
+      "title": "Bool",
+      "anyOf": [
+        {
+          "title": "False",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": []
+        },
+        {
+          "title": "True",
+          "dataType": "constructor",
+          "index": 1,
+          "fields": []
+        }
+      ]
+    },
+    "Data": {
+      "title": "Data",
+      "description": "Any Plutus data."
+    },
+    "Int": {
+      "dataType": "integer"
+    },
+    "Option<cardano/address/StakeCredential>": {
+      "title": "Option",
+      "anyOf": [
+        {
+          "title": "Some",
+          "description": "An optional value.",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "$ref": "#/definitions/cardano~1address~1StakeCredential"
+            }
+          ]
+        },
+        {
+          "title": "None",
+          "description": "Nothing.",
+          "dataType": "constructor",
+          "index": 1,
+          "fields": []
+        }
+      ]
+    },
+    "aiken/crypto/ScriptHash": {
+      "title": "ScriptHash",
+      "dataType": "bytes"
+    },
+    "aiken/crypto/VerificationKeyHash": {
+      "title": "VerificationKeyHash",
+      "dataType": "bytes"
+    },
+    "cardano/address/Address": {
+      "title": "Address",
+      "description": "A Cardano `Address` typically holding one or two credential references.\n\n Note that legacy bootstrap addresses (a.k.a. 'Byron addresses') are\n completely excluded from Plutus contexts. Thus, from an on-chain\n perspective only exists addresses of type 00, 01, ..., 07 as detailed\n in [CIP-0019 :: Shelley Addresses](https://github.com/cardano-foundation/CIPs/tree/master/CIP-0019/#shelley-addresses).",
+      "anyOf": [
+        {
+          "title": "Address",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "title": "payment_credential",
+              "$ref": "#/definitions/cardano~1address~1PaymentCredential"
+            },
+            {
+              "title": "stake_credential",
+              "$ref": "#/definitions/Option<cardano~1address~1StakeCredential>"
+            }
+          ]
+        }
+      ]
+    },
+    "cardano/address/Credential": {
+      "title": "Credential",
+      "description": "A general structure for representing an on-chain `Credential`.\n\n Credentials are always one of two kinds: a direct public/private key\n pair, or a script (native or Plutus).",
+      "anyOf": [
+        {
+          "title": "VerificationKey",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "$ref": "#/definitions/aiken~1crypto~1VerificationKeyHash"
+            }
+          ]
+        },
+        {
+          "title": "Script",
+          "dataType": "constructor",
+          "index": 1,
+          "fields": [
+            {
+              "$ref": "#/definitions/aiken~1crypto~1ScriptHash"
+            }
+          ]
+        }
+      ]
+    },
+    "cardano/address/PaymentCredential": {
+      "title": "PaymentCredential",
+      "description": "A general structure for representing an on-chain `Credential`.\n\n Credentials are always one of two kinds: a direct public/private key\n pair, or a script (native or Plutus).",
+      "anyOf": [
+        {
+          "title": "VerificationKey",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "$ref": "#/definitions/aiken~1crypto~1VerificationKeyHash"
+            }
+          ]
+        },
+        {
+          "title": "Script",
+          "dataType": "constructor",
+          "index": 1,
+          "fields": [
+            {
+              "$ref": "#/definitions/aiken~1crypto~1ScriptHash"
+            }
+          ]
+        }
+      ]
+    },
+    "cardano/address/StakeCredential": {
+      "title": "StakeCredential",
+      "description": "Represent a type of object that can be represented either inline (by hash)\n or via a reference (i.e. a pointer to an on-chain location).\n\n This is mainly use for capturing pointers to a stake credential\n registration certificate in the case of so-called pointer addresses.",
+      "anyOf": [
+        {
+          "title": "Inline",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "$ref": "#/definitions/cardano~1address~1Credential"
+            }
+          ]
+        },
+        {
+          "title": "Pointer",
+          "dataType": "constructor",
+          "index": 1,
+          "fields": [
+            {
+              "title": "slot_number",
+              "$ref": "#/definitions/Int"
+            },
+            {
+              "title": "transaction_index",
+              "$ref": "#/definitions/Int"
+            },
+            {
+              "title": "certificate_index",
+              "$ref": "#/definitions/Int"
+            }
+          ]
+        }
+      ]
+    },
+    "cardano/assets/Lovelace": {
+      "title": "Lovelace",
+      "dataType": "integer"
+    },
+    "cardano/assets/PolicyId": {
+      "title": "PolicyId",
+      "dataType": "bytes"
+    },
+    "seatmint/types/GlobalSettings": {
+      "title": "GlobalSettings",
+      "anyOf": [
+        {
+          "title": "GlobalSettings",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "title": "platform_fee_percent",
+              "$ref": "#/definitions/Int"
+            },
+            {
+              "title": "platform_treasury",
+              "$ref": "#/definitions/cardano~1address~1Address"
+            },
+            {
+              "title": "current_max_supply",
+              "$ref": "#/definitions/Int"
+            },
+            {
+              "title": "max_resale_multiplier",
+              "$ref": "#/definitions/Int"
+            },
+            {
+              "title": "is_market_active",
+              "$ref": "#/definitions/Bool"
+            },
+            {
+              "title": "admin_pkh",
+              "$ref": "#/definitions/aiken~1crypto~1VerificationKeyHash"
+            }
+          ]
+        }
+      ]
+    },
+    "seatmint/types/MintAction": {
+      "title": "MintAction",
+      "anyOf": [
+        {
+          "title": "Mint",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": []
+        },
+        {
+          "title": "Burn",
+          "dataType": "constructor",
+          "index": 1,
+          "fields": []
+        }
+      ]
+    },
+    "seatmint/types/StorefrontAction": {
+      "title": "StorefrontAction",
+      "anyOf": [
+        {
+          "title": "Buy",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": []
+        },
+        {
+          "title": "Cancel",
+          "dataType": "constructor",
+          "index": 1,
+          "fields": []
+        }
+      ]
+    },
+    "seatmint/types/TicketDatum": {
+      "title": "TicketDatum",
+      "anyOf": [
+        {
+          "title": "TicketDatum",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "title": "price",
+              "$ref": "#/definitions/cardano~1assets~1Lovelace"
+            },
+            {
+              "title": "seller",
+              "$ref": "#/definitions/cardano~1address~1Address"
+            },
+            {
+              "title": "artist",
+              "$ref": "#/definitions/cardano~1address~1Address"
+            },
+            {
+              "title": "royalty_rate",
+              "$ref": "#/definitions/Int"
+            },
+            {
+              "title": "original_mint_price",
+              "$ref": "#/definitions/cardano~1assets~1Lovelace"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

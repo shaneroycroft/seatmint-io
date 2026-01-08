@@ -1,0 +1,16 @@
+{
+  "721": {
+    "{PolicyID}": {
+      "Event-A101": {
+        "name": "SeatMint.io: Summer Jam 2026",
+        "image": "ipfs://QmYourImageHash",
+        "mediaType": "image/png",
+        "description": "General Admission - Section A, Row 1, Seat 101",
+        "venue": "The Cardano Arena",
+        "date": "2026-08-15",
+        "seat": "A101",
+        "organizer": "SeatMint"
+      }
+    }
+  }
+}
