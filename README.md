@@ -23,21 +23,6 @@ User stories are written in the standard format:
 - As a developer/contributor, I want comprehensive Aiken unit & property tests for all validators so that smart contract behavior is verifiable.
 - As anyone, I want full transparency of ticket ownership, transfers, and sales on-chain via Blockfrost explorers so that trust is built-in.
 
-## Getting Started (Development)
-
-1. Clone the repo: `git clone https://github.com/YOUR_USERNAME/seatmint.git`
-2. Install Aiken: Use `aikup` (official installer) → latest version with Plutus V3 support
-3. Setup Supabase: `supabase init` + link project + apply migrations
-4. Get Blockfrost API key (testnet first)
-5. Run Aiken contracts: `cd aiken && aiken check && aiken build`
-6. Start frontend: `cd frontend && npm install && npm run dev`
-
-Detailed setup in `/docs/DEVELOPMENT.md` (coming soon).
-
-## Contributing
-
-Focus areas right now: Aiken minting policy + CIP-68 datum logic, validator security, frontend wallet flows.
-
 ## License
 
 MIT © 2026 SeatMint.io contributors
