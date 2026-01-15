@@ -69,6 +69,8 @@ pub type TimeWindow {
   end_time: Int,
 }
 
+// POSIXTime in milliseconds
+
 /// Whitelist for presales and early access
 pub type Whitelist {
   approved_addresses: List<VerificationKeyHash>,
@@ -79,14 +81,18 @@ pub type AntiScalpingRules {
   max_per_transaction: Int,
   // Limit per tx (e.g., 4 tickets)
   max_per_wallet: Int,
-  // Total limit per address
+  // Total limit per address (future: requires state tracking)
   cooldown_period: Int,
 }
+
+// Seconds between purchases (future: requires state tracking)
 
 /// Pricing strategies (extensible for future features)
 pub type PricingStrategy {
   FixedPrice { price: Int }
 }
+
+// Future: TimeBased, DemandBased, Tiered, etc.
 
 /// Purchase action for primary sales
 pub type SaleRedeemer {
@@ -95,6 +101,8 @@ pub type SaleRedeemer {
   // Total payment in lovelace
   buyer_pkh: VerificationKeyHash,
 }
+
+// Buyer's public key hash
 
 // ============================================
 // SECONDARY MARKET TYPES (Storefront)
@@ -128,3 +136,85 @@ pub type StorefrontAction {
   Cancel
   TransferTicket { new_owner: Address }
 }
+// ============================================
+// FUTURE ENHANCEMENT TYPES (Commented for reference)
+// ============================================
+
+// /// Window types for different sale phases
+// pub type WindowType {
+//   Presale           // Whitelist-only early access
+//   EarlyBird         // Discounted pricing for early buyers
+//   GeneralSale       // Open to everyone
+//   LastChance        // Final hours before event
+// }
+
+// /// Merkle proof for gas-efficient large whitelists
+// pub type MerkleProof {
+//   leaf: ByteArray,
+//   siblings: List<ByteArray>,
+// }
+
+// /// Time-based dynamic pricing
+// pub type TimePricingStrategy {
+//   base_price: Int,
+//   early_bird_price: Int,
+//   early_bird_deadline: Int,      // POSIXTime
+//   surge_price: Int,
+//   surge_threshold: Int,           // Hours before event
+// }
+
+// /// Demand-based pricing (surge pricing)
+// pub type DemandPricingStrategy {
+//   base_price: Int,
+//   max_price: Int,
+//   surge_multiplier: Int,          // e.g., 150 = 1.5x price
+//   velocity_threshold: Int,        // Sales per hour to trigger surge
+// }
+
+// /// Tiered pricing (volume discounts)
+// pub type TieredPricingStrategy {
+//   tiers: List<PriceTier>,
+// }
+
+// pub type PriceTier {
+//   quantity_threshold: Int,        // Buy 5+ tickets
+//   price_per_ticket: Int,          // Get discounted price
+// }
+
+// ============================================
+// OFF-CHAIN TYPES (For analytics/tracking)
+// ============================================
+
+// These types are primarily for off-chain use and can be stored
+// in databases or used for reporting/analytics
+
+// /// Sale analytics for tracking and reporting
+// pub type SaleAnalytics {
+//   total_sold: Int,
+//   revenue_generated: Int,
+//   unique_buyers: Int,
+//   average_purchase_size: Int,
+//   peak_sale_velocity: Int,        // Tickets sold per hour
+//   last_purchase_time: Int,        // POSIXTime
+// }
+
+// /// Pre-configured sale templates for easy event creation
+// pub type SalePreset {
+//   StandardSale              // Basic fixed-price sale
+//   PresaleWithWhitelist      // Whitelist + time window
+//   AntiScalpingEnabled       // Purchase limits + cooldown
+//   DynamicPricing            // Time-based or demand-based
+//   VIPAccess                 // Tiered pricing with early access
+// }
+
+// ============================================
+// TYPE ALIASES (For clarity)
+// ============================================
+
+// Note: These are just documentation - Aiken doesn't have type aliases
+// Use Int directly in code, these comments explain the meaning
+
+// Lovelace = Int           // Amount in lovelace (1 ADA = 1,000,000 lovelace)
+// BasisPoints = Int        // Percentage in basis points (250 = 2.5%, 1000 = 10%)
+// POSIXTime = Int          // Unix timestamp in milliseconds
+// Quantity = Int           // Number of tickets/items
