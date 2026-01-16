@@ -10,14 +10,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@emurgo/cardano-serialization-lib-browser": "^12.1.1",
-    "@lucid-evolution/lucid": "^0.3.53",
+    "@emurgo/cardano-serialization-lib-browser": "^15.0.3",
+    "@lucid-evolution/lucid": "^0.4.29",
     "@supabase/supabase-js": "^2.90.1",
     "bech32": "^2.0.0",
     "bip39": "^3.1.0",
     "blake2b": "^2.1.4",
     "buffer": "^6.0.3",
-    "libsodium-wrappers-sumo": "^0.7.13",
+    "libsodium-wrappers-sumo": "^0.7.16",
     "lodash-es": "^4.17.21",
     "pbkdf2": "^3.1.2",
     "react": "^18.3.1",

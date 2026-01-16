@@ -1,6 +1,12 @@
 import { useLucid } from "./hooks/useLucid";
 import { useGenesis } from "./hooks/useGenesis";
 
+// Brand configuration - change name here when ready
+const BRAND = {
+  name: 'Seatmint', // TODO: Update with new brand name when available !!!
+  tagline: 'Cardano Ticketing Platform'
+};
+
 export default function App() {
   const { 
     lucid, 
@@ -31,7 +37,7 @@ export default function App() {
 
   return (
     <div style={{ padding: '40px', maxWidth: '800px', margin: '0 auto', fontFamily: 'system-ui', backgroundColor: '#1a1a1a', minHeight: '100vh' }}>
-      <h1 style={{ color: '#fff', marginBottom: '30px' }}>🎫 Seatmint Admin</h1>
+      <h1 style={{ color: '#fff', marginBottom: '30px' }}>🎫 {BRAND.name} Admin</h1>
       
       <div style={{ 
         backgroundColor: '#2a2a2a', 
@@ -167,8 +173,8 @@ export default function App() {
         borderRadius: '4px',
         border: '1px solid #f4a261'
       }}>
-        <p style={{ margin: 0, fontSize: '14px', color: '#f4a261' }}>
-          <strong>💡 Next Steps:</strong> <span style={{ color: '#e9c46a' }}>After initialization, you can start creating events and minting tickets on the Cardano blockchain.</span>
+                    <p style={{ margin: 0, fontSize: '14px', color: '#f4a261' }}>
+          <strong>💡 Next Steps:</strong> <span style={{ color: '#e9c46a' }}>After initialization, you can start creating events and minting tickets with {BRAND.name}.</span>
         </p>
       </div>
     </div>
