@@ -1,5 +1,11 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import {
+  listTicketForResale,
+  purchaseFromStorefront,
+  cancelStorefrontListing,
+  transferTicket,
+} from '../services/ticketService';
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -8,6 +14,7 @@ const supabase = createClient(
 
 interface Ticket {
   id: string;
+  event_id: string;
   event_name: string;
   tier_name: string;
   ticket_number: number;
@@ -17,6 +24,9 @@ interface Ticket {
   is_listed: boolean;
   event_date: string;
   venue: string;
+  nft_asset_name: string;
+  listing_utxo_ref: string | null;
+  event_policy_id: string;
 }
 
 interface MarketplaceProps {
@@ -24,7 +34,7 @@ interface MarketplaceProps {
   userAddress: string;
 }
 
-export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid: _lucid, userAddress }) => {
+export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddress }) => {
   const [listings, setListings] = useState<Ticket[]>([]);
   const [myTickets, setMyTickets] = useState<Ticket[]>([]);
   const [activeTab, setActiveTab] = useState<'browse' | 'my-tickets'>('browse');
@@ -70,6 +80,7 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid: _lucid, u
   const formatTickets = (data: any[]): Ticket[] => {
     return data.map(ticket => ({
       id: ticket.id,
+      event_id: ticket.event_id,
       event_name: ticket.events?.event_name || 'Unknown Event',
       tier_name: ticket.ticket_tiers?.tier_name || 'General',
       ticket_number: ticket.ticket_number,
@@ -79,52 +90,54 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid: _lucid, u
       is_listed: ticket.status === 'listed',
       event_date: ticket.events?.event_date || '',
       venue: ticket.events?.venue_name || '',
+      nft_asset_name: ticket.nft_asset_name || '',
+      listing_utxo_ref: ticket.listing_utxo_ref || null,
+      event_policy_id: ticket.events?.event_policy_id || '',
     }));
   };
 
-  const listTicketForSale = async (ticketId: string, priceAda: number) => {
+  const handleListTicketForSale = async (ticket: Ticket, priceAda: number) => {
     try {
-      // TODO: Build and submit storefront listing transaction
-      console.log('Listing ticket:', ticketId, 'for', priceAda, 'ADA');
-      
-      await supabase
-        .from('tickets')
-        .update({
-          status: 'listed',
-          resale_price: Math.floor(priceAda * 1_000_000)
-        })
-        .eq('id', ticketId);
+      console.log('Listing ticket:', ticket.id, 'for', priceAda, 'ADA');
 
+      const result = await listTicketForResale(lucid, {
+        ticketAssetName: ticket.nft_asset_name,
+        priceAda,
+        eventId: ticket.event_id,
+      });
+
+      console.log('Listed successfully:', result);
       alert('✅ Ticket listed successfully!');
       loadData();
     } catch (err) {
-      alert('❌ Failed to list ticket');
+      alert('❌ Failed to list ticket: ' + (err instanceof Error ? err.message : 'Unknown error'));
       console.error(err);
     }
   };
 
-  const cancelListing = async (ticketId: string) => {
+  const handleCancelListing = async (ticket: Ticket) => {
     try {
-      // TODO: Build and submit cancel transaction
-      console.log('Canceling listing:', ticketId);
-      
-      await supabase
-        .from('tickets')
-        .update({
-          status: 'minted',
-          resale_price: null
-        })
-        .eq('id', ticketId);
+      if (!ticket.listing_utxo_ref) {
+        throw new Error('No listing UTxO reference found');
+      }
 
+      console.log('Canceling listing:', ticket.id);
+
+      const result = await cancelStorefrontListing(lucid, {
+        listingUtxoRef: ticket.listing_utxo_ref,
+        ticketId: ticket.id,
+      });
+
+      console.log('Canceled successfully:', result);
       alert('✅ Listing canceled');
       loadData();
     } catch (err) {
-      alert('❌ Failed to cancel listing');
+      alert('❌ Failed to cancel listing: ' + (err instanceof Error ? err.message : 'Unknown error'));
       console.error(err);
     }
   };
 
-  const purchaseTicket = async (ticket: Ticket) => {
+  const handlePurchaseTicket = async (ticket: Ticket) => {
     if (!ticket.resale_price) return;
 
     if (!confirm(`Purchase ${ticket.event_name} - ${ticket.tier_name} for ${ticket.resale_price} ADA?`)) {
@@ -132,26 +145,41 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid: _lucid, u
     }
 
     try {
-      // TODO: Build and submit purchase transaction
+      if (!ticket.listing_utxo_ref) {
+        throw new Error('No listing UTxO reference found');
+      }
+
       console.log('Purchasing ticket:', ticket.id);
-      
+
+      const result = await purchaseFromStorefront(lucid, {
+        listingUtxoRef: ticket.listing_utxo_ref,
+        eventId: ticket.event_id,
+      });
+
+      console.log('Purchased successfully:', result);
       alert('✅ Ticket purchased! Check your wallet.');
       loadData();
     } catch (err) {
-      alert('❌ Purchase failed');
+      alert('❌ Purchase failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
       console.error(err);
     }
   };
 
-  const transferTicket = async (ticketId: string, recipientAddress: string) => {
+  const handleTransferTicket = async (ticket: Ticket, recipientAddress: string) => {
     try {
-      // TODO: Build and submit transfer transaction
-      console.log('Transferring ticket:', ticketId, 'to', recipientAddress);
-      
+      console.log('Transferring ticket:', ticket.id, 'to', recipientAddress);
+
+      const result = await transferTicket(lucid, {
+        ticketAssetName: ticket.nft_asset_name,
+        recipientAddress,
+        eventPolicyId: ticket.event_policy_id,
+      });
+
+      console.log('Transferred successfully:', result);
       alert('✅ Ticket transferred!');
       loadData();
     } catch (err) {
-      alert('❌ Transfer failed');
+      alert('❌ Transfer failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
       console.error(err);
     }
   };
@@ -221,7 +249,7 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid: _lucid, u
                   key={ticket.id}
                   ticket={ticket}
                   action="buy"
-                  onAction={() => purchaseTicket(ticket)}
+                  onAction={() => handlePurchaseTicket(ticket)}
                 />
               ))}
             </div>
@@ -252,15 +280,15 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid: _lucid, u
                   action={ticket.is_listed ? 'cancel' : 'list'}
                   onAction={() => {
                     if (ticket.is_listed) {
-                      cancelListing(ticket.id);
+                      handleCancelListing(ticket);
                     } else {
                       const price = prompt('List price (ADA):');
-                      if (price) listTicketForSale(ticket.id, parseFloat(price));
+                      if (price) handleListTicketForSale(ticket, parseFloat(price));
                     }
                   }}
                   onTransfer={() => {
                     const recipient = prompt('Recipient address:');
-                    if (recipient) transferTicket(ticket.id, recipient);
+                    if (recipient) handleTransferTicket(ticket, recipient);
                   }}
                 />
               ))}

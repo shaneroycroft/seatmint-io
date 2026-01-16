@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Lucid } from '@lucid-evolution/lucid';
 import { createClient } from '@supabase/supabase-js';
+import { initializePlatformSettings } from '../services/ticketService';
 
 // Get the return type of Lucid function (the actual instance type)
 type LucidInstance = Awaited<ReturnType<typeof Lucid>>;
@@ -42,11 +43,12 @@ export const useGenesis = (): UseGenesisReturn => {
       console.log('🚀 Initializing Seatmint Platform...');
       console.log('📍 Connected Address:', walletAddress);
 
-      // Step 1: Check if platform is already initialized in Supabase
+      // Step 1: Check if platform Settings NFT is already initialized
       const { data: existingPlatform, error: fetchError } = await supabase
         .from('platform_config')
-        .select('*')
-        .maybeSingle(); // Use maybeSingle() instead of single() to avoid 406 errors
+        .select('settings_policy_id, settings_utxo_ref, admin_address')
+        .eq('id', 'main')
+        .maybeSingle();
 
       if (fetchError && fetchError.code !== 'PGRST116') {
         throw new Error(`Database error: ${fetchError.message}`);
@@ -54,67 +56,31 @@ export const useGenesis = (): UseGenesisReturn => {
 
       let platformAddress: string;
 
-      if (existingPlatform) {
-        // Platform already exists
-        platformAddress = existingPlatform.platform_address;
-        console.log('✅ Platform already initialized:', platformAddress);
+      // Check if Settings NFT was actually minted (not just row exists)
+      if (existingPlatform?.settings_policy_id && existingPlatform?.settings_utxo_ref) {
+        // Platform Settings NFT already exists
+        platformAddress = existingPlatform.admin_address || walletAddress;
+        console.log('✅ Platform already initialized with Settings NFT');
+        console.log('   Policy ID:', existingPlatform.settings_policy_id);
+        console.log('   UTxO Ref:', existingPlatform.settings_utxo_ref);
       } else {
-        // Step 2: Create genesis transaction (platform initialization)
-        console.log('📝 Creating genesis transaction...');
+        // Step 2: Mint Settings NFT using initializePlatformSettings
+        console.log('📝 Minting Settings NFT...');
+        console.log('⏳ This will require signing a transaction...');
 
-        // OPTION 1: Use your own wallet address for testing
-        // This sends the genesis transaction to yourself
-        const scriptAddress = walletAddress;
-        
-        // OPTION 2 (Later): Replace with your actual Aiken validator address
-        // const scriptAddress = 'addr_test1wq...'; // Your compiled Aiken script address
+        const result = await initializePlatformSettings(lucidInstance, {
+          platformFeeBps: 250,      // 2.5% platform fee
+          isMarketActive: true,
+          currentMaxSupply: 10000,
+          maxResaleMultiplier: 300, // 3x max resale
+        });
 
-        // Build genesis transaction using Lucid Evolution API
-        const tx = await lucidInstance
-          .newTx()
-          .pay.ToAddress(scriptAddress, { lovelace: 10_000_000n }) // 10 ADA minimum
-          .attachMetadata(674, {
-            msg: ['Seatmint Platform Genesis'],
-            platform: 'Seatmint.io',
-            version: '1.0.0',
-            timestamp: Date.now(),
-          })
-          .complete();
+        console.log('✅ Settings NFT minted!');
+        console.log('   Policy ID:', result.settingsPolicyId);
+        console.log('   UTxO Ref:', result.settingsUtxoRef);
+        console.log('   TX Hash:', result.txHash);
 
-        const signedTx = await tx.sign.withWallet().complete();
-        const txHash = await signedTx.submit();
-
-        console.log('⏳ Genesis transaction submitted:', txHash);
-        console.log('⏳ Awaiting confirmation (this may take 30-60 seconds)...');
-
-        // Wait for confirmation with better error handling
-        try {
-          await lucidInstance.awaitTx(txHash, 60000); // 60 second timeout
-          console.log('✅ Genesis transaction confirmed!');
-        } catch (awaitError) {
-          // Transaction was submitted but confirmation timed out
-          // This is okay - we can still proceed
-          console.warn('⚠️ Transaction confirmation timed out, but transaction was submitted');
-          console.log('🔍 Check transaction status at: https://preview.cardanoscan.io/transaction/' + txHash);
-        }
-
-        // Step 3: Store platform configuration in Supabase
-        const { error: insertError } = await supabase
-          .from('platform_config')
-          .insert({
-            platform_address: scriptAddress,
-            genesis_tx_hash: txHash,
-            initialized_at: new Date().toISOString(),
-            initialized_by: walletAddress,
-            network: import.meta.env.VITE_NETWORK,
-          });
-
-        if (insertError) {
-          throw new Error(`Failed to store platform config: ${insertError.message}`);
-        }
-
-        platformAddress = scriptAddress;
-        console.log('💾 Platform configuration saved to database');
+        platformAddress = walletAddress;
       }
 
       setState({

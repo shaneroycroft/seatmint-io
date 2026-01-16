@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { useLucid } from "./hooks/useLucid";
 import { useGenesis } from "./hooks/useGenesis";
+import { CreateEvent } from "./components/CreateEvent";
+import { TicketMarketplace } from "./components/TicketMarketplace";
 
 // Brand configuration - change name here when ready
 const BRAND = {
@@ -7,24 +10,28 @@ const BRAND = {
   tagline: 'Cardano Ticketing Platform'
 };
 
+type AppTab = 'setup' | 'create-event' | 'marketplace';
+
 export default function App() {
-  const { 
-    lucid, 
+  const [activeTab, setActiveTab] = useState<AppTab>('setup');
+
+  const {
+    lucid,
     address,
     isConnected,
     isConnecting,
     error: walletError,
-    connectWallet, 
+    connectWallet,
     disconnectWallet,
-    availableWallets 
+    availableWallets
   } = useLucid();
-  
-  const { 
+
+  const {
     isInitialized,
     isInitializing,
     platformAddress,
     error: genesisError,
-    initializePlatform 
+    initializePlatform
   } = useGenesis();
 
   const handleInitialize = async () => {
@@ -35,11 +42,94 @@ export default function App() {
     }
   };
 
+  // Check if platform is ready for main features
+  const isPlatformReady = isConnected && isInitialized && lucid && address;
+
   return (
-    <div style={{ padding: '40px', maxWidth: '800px', margin: '0 auto', fontFamily: 'system-ui', backgroundColor: '#1a1a1a', minHeight: '100vh' }}>
-      <h1 style={{ color: '#fff', marginBottom: '30px' }}>🎫 {BRAND.name} Admin</h1>
-      
-      <div style={{ 
+    <div style={{ padding: '40px', maxWidth: '1200px', margin: '0 auto', fontFamily: 'system-ui', backgroundColor: '#1a1a1a', minHeight: '100vh' }}>
+      <h1 style={{ color: '#fff', marginBottom: '20px' }}>🎫 {BRAND.name}</h1>
+
+      {/* Navigation Tabs */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '30px', flexWrap: 'wrap' }}>
+        <button
+          onClick={() => setActiveTab('setup')}
+          style={{
+            padding: '12px 24px',
+            backgroundColor: activeTab === 'setup' ? '#4CAF50' : '#2a2a2a',
+            color: '#fff',
+            border: activeTab === 'setup' ? '2px solid #4CAF50' : '1px solid #444',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '16px'
+          }}
+        >
+          ⚙️ Setup
+        </button>
+        <button
+          onClick={() => setActiveTab('create-event')}
+          disabled={!isPlatformReady}
+          style={{
+            padding: '12px 24px',
+            backgroundColor: activeTab === 'create-event' ? '#4CAF50' : '#2a2a2a',
+            color: '#fff',
+            border: activeTab === 'create-event' ? '2px solid #4CAF50' : '1px solid #444',
+            borderRadius: '4px',
+            cursor: isPlatformReady ? 'pointer' : 'not-allowed',
+            fontSize: '16px',
+            opacity: isPlatformReady ? 1 : 0.5
+          }}
+        >
+          🎪 Create Event
+        </button>
+        <button
+          onClick={() => setActiveTab('marketplace')}
+          disabled={!isPlatformReady}
+          style={{
+            padding: '12px 24px',
+            backgroundColor: activeTab === 'marketplace' ? '#4CAF50' : '#2a2a2a',
+            color: '#fff',
+            border: activeTab === 'marketplace' ? '2px solid #4CAF50' : '1px solid #444',
+            borderRadius: '4px',
+            cursor: isPlatformReady ? 'pointer' : 'not-allowed',
+            fontSize: '16px',
+            opacity: isPlatformReady ? 1 : 0.5
+          }}
+        >
+          🛒 Marketplace
+        </button>
+
+        {/* Wallet status indicator */}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {isConnected ? (
+            <>
+              <span style={{ color: '#4CAF50', fontSize: '14px' }}>
+                ✅ {address?.slice(0, 8)}...{address?.slice(-6)}
+              </span>
+              <button
+                onClick={disconnectWallet}
+                style={{
+                  padding: '8px 12px',
+                  backgroundColor: '#ff6b6b',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '12px'
+                }}
+              >
+                Disconnect
+              </button>
+            </>
+          ) : (
+            <span style={{ color: '#ff6b6b', fontSize: '14px' }}>⚠️ Wallet not connected</span>
+          )}
+        </div>
+      </div>
+
+      {/* Setup Tab */}
+      {activeTab === 'setup' && (
+        <>
+          <div style={{ 
         backgroundColor: '#2a2a2a', 
         padding: '20px', 
         borderRadius: '8px', 
@@ -165,18 +255,31 @@ export default function App() {
         )}
       </div>
 
-      <hr style={{ margin: '30px 0', borderColor: '#444' }} />
+          {isPlatformReady && (
+            <div style={{
+              backgroundColor: '#1a4d2e',
+              padding: '15px',
+              borderRadius: '4px',
+              border: '1px solid #4CAF50',
+              marginTop: '20px'
+            }}>
+              <p style={{ margin: 0, fontSize: '14px', color: '#4CAF50' }}>
+                <strong>✅ Ready!</strong> <span style={{ color: '#a5d6a7' }}>Use the tabs above to create events or browse the marketplace.</span>
+              </p>
+            </div>
+          )}
+        </>
+      )}
 
-      <div style={{ 
-        backgroundColor: '#3d2f1f', 
-        padding: '15px', 
-        borderRadius: '4px',
-        border: '1px solid #f4a261'
-      }}>
-                    <p style={{ margin: 0, fontSize: '14px', color: '#f4a261' }}>
-          <strong>💡 Next Steps:</strong> <span style={{ color: '#e9c46a' }}>After initialization, you can start creating events and minting tickets with {BRAND.name}.</span>
-        </p>
-      </div>
+      {/* Create Event Tab */}
+      {activeTab === 'create-event' && isPlatformReady && (
+        <CreateEvent lucid={lucid} walletAddress={address} />
+      )}
+
+      {/* Marketplace Tab */}
+      {activeTab === 'marketplace' && isPlatformReady && (
+        <TicketMarketplace lucid={lucid} userAddress={address} />
+      )}
     </div>
   );
 }

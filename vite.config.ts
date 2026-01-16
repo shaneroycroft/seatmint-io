@@ -32,8 +32,8 @@ export default defineConfig({
       lodash: 'lodash-es',
       
       // Fix libsodium-wrappers-sumo ESM resolution issue
-      'libsodium-wrappers-sumo': 'libsodium-wrappers-sumo/dist/modules-sumo/libsodium-wrappers.js',
-      'libsodium-wrappers': 'libsodium-wrappers/dist/modules/libsodium-wrappers.js',
+      'libsodium-wrappers-sumo': path.resolve(__dirname, 'node_modules/libsodium-wrappers-sumo/dist/modules-sumo/libsodium-wrappers.js'),
+      'libsodium-wrappers': path.resolve(__dirname, 'node_modules/libsodium-wrappers/dist/modules/libsodium-wrappers.js'),
     },
   },
 
@@ -60,12 +60,10 @@ export default defineConfig({
       '@harmoniclabs/plutus-data',
       '@harmoniclabs/cbor',
       '@harmoniclabs/uint8array-utils',
+      'serialize-error',
+      'fraction.js',
     ],
-    exclude: [
-      '@lucid-evolution/lucid',
-      '@lucid-evolution/plutus',
-      '@lucid-evolution/core-types',
-    ],
+    exclude: [],
   },
 
   define: {
@@ -93,7 +91,12 @@ export default defineConfig({
       transformMixedEsModules: true,
       include: [/node_modules/],
       requireReturnsDefault: 'auto',
+      esmExternals: true,
     },
+  },
+
+  ssr: {
+    noExternal: ['serialize-error'],
   },
 
   server: {

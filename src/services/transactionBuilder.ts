@@ -1,7 +1,6 @@
 import { Data, fromText, LucidEvolution, UTxO, Constr, getAddressDetails } from '@lucid-evolution/lucid';
 import {
   EVENT_MINT_VALIDATOR,
-  SETTINGS_VALIDATOR,
   PRIMARY_SALE_VALIDATOR,
   STOREFRONT_VALIDATOR,
   MintRedeemer,
@@ -460,13 +459,10 @@ export async function buildUpdateSettingsTx(
 
 /**
  * Find settings UTxO on-chain
+ * Note: Settings is an NFT pattern, not a validator. Use ticketService.getSettingsUTxO for full implementation.
+ * This is a simplified version that searches for UTxOs containing "Settings" token.
  */
-export async function findSettingsUtxo(lucid: LucidInstance): Promise<UTxO | undefined> {
-  const config = lucid.config();
-  const settingsAddress = config.network === 'Mainnet'
-    ? `addr1${SETTINGS_VALIDATOR!.hash}`
-    : `addr_test1${SETTINGS_VALIDATOR!.hash}`;
-
+export async function findSettingsUtxo(lucid: LucidInstance, settingsAddress: string): Promise<UTxO | undefined> {
   const utxos = await lucid.utxosAt(settingsAddress);
 
   // Find UTxO with settings token
