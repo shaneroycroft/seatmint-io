@@ -9,11 +9,10 @@ const supabase = createClient(
 );
 
 interface CreateEventProps {
-  lucid: any; // LucidInstance
+  lucid: any;
   walletAddress: string;
 }
 
-// Known venues database - can be expanded or moved to Supabase later
 interface Venue {
   name: string;
   address: string;
@@ -45,16 +44,7 @@ const KNOWN_VENUES: Venue[] = [
   { name: 'Bridgestone Arena', address: '501 Broadway', city: 'Nashville, TN', country: 'USA', capacity: 19691 },
 ];
 
-// Transaction status steps
-type TxStatus =
-  | 'idle'
-  | 'validating'
-  | 'building'
-  | 'awaiting_signature'
-  | 'submitting'
-  | 'confirming'
-  | 'complete'
-  | 'error';
+type TxStatus = 'idle' | 'validating' | 'building' | 'awaiting_signature' | 'submitting' | 'confirming' | 'complete' | 'error';
 
 const TX_STATUS_MESSAGES: Record<TxStatus, string> = {
   idle: '',
@@ -67,7 +57,6 @@ const TX_STATUS_MESSAGES: Record<TxStatus, string> = {
   error: 'Transaction failed',
 };
 
-// Get minimum datetime (now) for the date picker
 const getMinDateTime = () => {
   const now = new Date();
   now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
@@ -86,13 +75,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
   });
 
   const [ticketTiers, setTicketTiers] = useState<TicketTier[]>([
-    {
-      tierName: 'General Admission',
-      tierDescription: 'Standard entry',
-      priceAda: 50,
-      totalSupply: 100,
-      maxPerWallet: 4,
-    },
+    { tierName: 'General Admission', tierDescription: 'Standard entry', priceAda: 50, totalSupply: 100, maxPerWallet: 4 },
   ]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -102,26 +85,23 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
   const [createdEventId, setCreatedEventId] = useState<string | null>(null);
   const [createdPolicyId, setCreatedPolicyId] = useState<string | null>(null);
 
-  // Venue autocomplete state
+  // Venue autocomplete
   const [venueQuery, setVenueQuery] = useState('');
   const [venueSuggestions, setVenueSuggestions] = useState<Venue[]>([]);
   const [showVenueSuggestions, setShowVenueSuggestions] = useState(false);
   const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
   const venueInputRef = useRef<HTMLInputElement>(null);
 
-  // Duplicate event warning
+  // Duplicate warning
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
   const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
 
-  // Filter venues based on query
   useEffect(() => {
     if (venueQuery.length >= 2) {
       const query = venueQuery.toLowerCase();
       const matches = KNOWN_VENUES.filter(
-        venue =>
-          venue.name.toLowerCase().includes(query) ||
-          venue.city.toLowerCase().includes(query)
-      ).slice(0, 5); // Limit to 5 suggestions
+        venue => venue.name.toLowerCase().includes(query) || venue.city.toLowerCase().includes(query)
+      ).slice(0, 5);
       setVenueSuggestions(matches);
       setShowVenueSuggestions(matches.length > 0);
     } else {
@@ -130,7 +110,6 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
     }
   }, [venueQuery]);
 
-  // Check for duplicate events when name, venue, and date are set
   useEffect(() => {
     const checkDuplicate = async () => {
       if (!formData.eventName || !formData.venue || !formData.eventDate) {
@@ -140,7 +119,6 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
 
       setIsCheckingDuplicate(true);
       try {
-        // Check for events with similar name at same venue on same date
         const eventDate = new Date(formData.eventDate);
         const dateStart = new Date(eventDate);
         dateStart.setHours(0, 0, 0, 0);
@@ -155,19 +133,13 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
           .lte('event_date', dateEnd.toISOString());
 
         if (existingEvents && existingEvents.length > 0) {
-          // Check for similar event names using simple similarity
           const similarEvent = existingEvents.find(event => {
-            const nameSimilarity = calculateSimilarity(
-              formData.eventName.toLowerCase(),
-              event.event_name.toLowerCase()
-            );
-            return nameSimilarity > 0.6; // 60% similarity threshold
+            const nameSimilarity = calculateSimilarity(formData.eventName.toLowerCase(), event.event_name.toLowerCase());
+            return nameSimilarity > 0.6;
           });
 
           if (similarEvent) {
-            setDuplicateWarning(
-              `A similar event "${similarEvent.event_name}" already exists at this venue on this date. Please verify this is not a duplicate.`
-            );
+            setDuplicateWarning(`A similar event "${similarEvent.event_name}" already exists at this venue on this date.`);
           } else {
             setDuplicateWarning(null);
           }
@@ -181,12 +153,10 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
       }
     };
 
-    // Debounce the check
     const timeout = setTimeout(checkDuplicate, 500);
     return () => clearTimeout(timeout);
   }, [formData.eventName, formData.venue, formData.eventDate]);
 
-  // Simple string similarity function (Dice coefficient)
   const calculateSimilarity = (str1: string, str2: string): number => {
     if (str1 === str2) return 1;
     if (str1.length < 2 || str2.length < 2) return 0;
@@ -204,7 +174,6 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
     return (2 * matches) / (str1.length + str2.length - 2);
   };
 
-  // Handle venue selection
   const selectVenue = (venue: Venue) => {
     setSelectedVenue(venue);
     setFormData({
@@ -216,24 +185,14 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
     setShowVenueSuggestions(false);
   };
 
-  // Handle venue input change
   const handleVenueChange = (value: string) => {
     setVenueQuery(value);
     setFormData({ ...formData, venue: value });
-    setSelectedVenue(null); // Clear selected venue if user types
+    setSelectedVenue(null);
   };
 
   const addTicketTier = () => {
-    setTicketTiers([
-      ...ticketTiers,
-      {
-        tierName: '',
-        tierDescription: '',
-        priceAda: 0,
-        totalSupply: 1,
-        maxPerWallet: 1,
-      },
-    ]);
+    setTicketTiers([...ticketTiers, { tierName: '', tierDescription: '', priceAda: 0, totalSupply: 1, maxPerWallet: 1 }]);
   };
 
   const removeTicketTier = (index: number) => {
@@ -257,25 +216,18 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
     setTxStatus('validating');
 
     try {
-      // Validate event date is in the future
       const eventDate = formData.eventDate ? new Date(formData.eventDate) : null;
       if (!eventDate || eventDate <= new Date()) {
         throw new Error('Event date must be in the future');
       }
 
-      // Validate at least one ticket tier
       if (ticketTiers.length === 0 || !ticketTiers[0].tierName) {
         throw new Error('At least one ticket tier is required');
       }
 
-      // Validate ticket tier prices
       for (const tier of ticketTiers) {
-        if (tier.priceAda < 0) {
-          throw new Error('Ticket prices cannot be negative');
-        }
-        if (tier.totalSupply < 1) {
-          throw new Error('Total supply must be at least 1');
-        }
+        if (tier.priceAda < 0) throw new Error('Ticket prices cannot be negative');
+        if (tier.totalSupply < 1) throw new Error('Total supply must be at least 1');
       }
 
       setTxStatus('building');
@@ -291,10 +243,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
         ticketTiers,
       };
 
-      // Note: The actual signing happens inside createEvent
-      // We update status here for UX, but the wallet prompt will appear
       setTxStatus('awaiting_signature');
-
       const result = await createEvent(lucid, eventParams);
 
       setTxStatus('complete');
@@ -313,30 +262,27 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
 
   if (success) {
     return (
-      <div style={{ padding: '40px', backgroundColor: '#1a4d2e', borderRadius: '8px', border: '1px solid #4CAF50' }}>
-        <h2 style={{ color: '#4CAF50', marginTop: 0 }}>Event Created Successfully!</h2>
-        <p style={{ color: '#a5d6a7', marginBottom: '20px' }}>
-          Your event has been saved to the blockchain. Tickets are now available for sale.
-        </p>
+      <div className="h-full flex items-center justify-center p-8">
+        <div className="max-w-lg w-full bg-white rounded-2xl shadow-xl p-8">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
 
-        {/* Event Details */}
-        <div style={{ backgroundColor: '#0d2818', padding: '15px', borderRadius: '4px', marginBottom: '20px' }}>
-          <p style={{ color: '#a5d6a7', margin: '0 0 10px 0', fontSize: '14px' }}>
-            <strong>Event ID:</strong>
-          </p>
-          <code style={{ color: '#4CAF50', fontSize: '12px', wordBreak: 'break-all' }}>
-            {createdEventId}
-          </code>
+          <h2 className="text-2xl font-black text-slate-900 text-center mb-2">Event Created!</h2>
+          <p className="text-slate-500 text-center mb-6">Your event is now live on the blockchain.</p>
 
-          <p style={{ color: '#a5d6a7', margin: '15px 0 10px 0', fontSize: '14px' }}>
-            <strong>Minting Policy ID:</strong>
-          </p>
-          <code style={{ color: '#4CAF50', fontSize: '12px', wordBreak: 'break-all' }}>
-            {createdPolicyId}
-          </code>
-        </div>
+          <div className="bg-slate-50 rounded-xl p-4 mb-4">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Event ID</p>
+            <p className="text-xs font-mono text-slate-700 break-all">{createdEventId}</p>
+          </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
+          <div className="bg-slate-50 rounded-xl p-4 mb-6">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Policy ID</p>
+            <p className="text-xs font-mono text-slate-700 break-all">{createdPolicyId}</p>
+          </div>
+
           <button
             onClick={() => {
               setSuccess(false);
@@ -344,23 +290,10 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
               setCreatedEventId(null);
               setCreatedPolicyId(null);
               setFormData({
-                eventName: '',
-                eventDescription: '',
-                eventDate: '',
-                location: '',
-                venue: '',
-                bannerImageUrl: '',
-                category: 'concert',
+                eventName: '', eventDescription: '', eventDate: '', location: '', venue: '', bannerImageUrl: '', category: 'concert',
               });
             }}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: '#4CAF50',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
+            className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors"
           >
             Create Another Event
           </button>
@@ -369,7 +302,6 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
     );
   }
 
-  // Determine tier type for preview color
   const getTierType = (name: string): 'general' | 'vip' | 'backstage' => {
     const lower = name.toLowerCase();
     if (lower.includes('vip')) return 'vip';
@@ -378,589 +310,326 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
   };
 
   return (
-    <div style={{ display: 'flex', gap: '30px', flexWrap: 'wrap' }}>
+    <div className="h-full flex flex-col lg:flex-row bg-white overflow-hidden">
       {/* Main Form */}
-      <div style={{ flex: '1 1 600px', minWidth: '300px' }}>
-        <div style={{ padding: '40px', backgroundColor: '#2a2a2a', borderRadius: '8px', border: '1px solid #444' }}>
-          <h2 style={{ color: '#fff', marginTop: 0 }}>Create New Event</h2>
-
-          <form onSubmit={handleSubmit}>
-            {/* Event Details */}
-            <div style={{ marginBottom: '30px' }}>
-              <h3 style={{ color: '#fff', borderBottom: '1px solid #444', paddingBottom: '10px' }}>
-                Event Details
-              </h3>
-
-          <label style={{ display: 'block', marginBottom: '15px' }}>
-            <span style={{ color: '#ccc', display: 'block', marginBottom: '5px' }}>Event Name *</span>
-            <input
-              type="text"
-              required
-              value={formData.eventName}
-              onChange={(e) => setFormData({ ...formData, eventName: e.target.value })}
-              style={{
-                width: '100%',
-                padding: '10px',
-                backgroundColor: '#1a1a1a',
-                border: '1px solid #444',
-                borderRadius: '4px',
-                color: '#fff',
-              }}
-              placeholder="Summer Music Festival 2026"
-            />
-          </label>
-
-          <label style={{ display: 'block', marginBottom: '15px' }}>
-            <span style={{ color: '#ccc', display: 'block', marginBottom: '5px' }}>Description</span>
-            <textarea
-              value={formData.eventDescription}
-              onChange={(e) => setFormData({ ...formData, eventDescription: e.target.value })}
-              rows={4}
-              style={{
-                width: '100%',
-                padding: '10px',
-                backgroundColor: '#1a1a1a',
-                border: '1px solid #444',
-                borderRadius: '4px',
-                color: '#fff',
-                fontFamily: 'inherit',
-              }}
-              placeholder="Describe your event..."
-            />
-          </label>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-            <label style={{ display: 'block' }}>
-              <span style={{ color: '#ccc', display: 'block', marginBottom: '5px' }}>Date & Time *</span>
-              <input
-                type="datetime-local"
-                required
-                min={getMinDateTime()}
-                value={formData.eventDate}
-                onChange={(e) => setFormData({ ...formData, eventDate: e.target.value as string })}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  backgroundColor: '#1a1a1a',
-                  border: '1px solid #444',
-                  borderRadius: '4px',
-                  color: '#fff',
-                }}
-              />
-              <span style={{ color: '#888', fontSize: '12px', marginTop: '4px', display: 'block' }}>
-                Must be a future date
-              </span>
-            </label>
-
-            <label style={{ display: 'block' }}>
-              <span style={{ color: '#ccc', display: 'block', marginBottom: '5px' }}>Category *</span>
-              <select
-                required
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value as EventCreationParams['category'] })}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  backgroundColor: '#1a1a1a',
-                  border: '1px solid #444',
-                  borderRadius: '4px',
-                  color: '#fff',
-                }}
-              >
-                <option value="concert">Concert</option>
-                <option value="sports">Sports</option>
-                <option value="theater">Theater</option>
-                <option value="conference">Conference</option>
-                <option value="other">Other</option>
-              </select>
-            </label>
-          </div>
-
-          {/* Venue Name with Autocomplete */}
-          <div style={{ position: 'relative', marginBottom: '15px', marginTop: '15px' }}>
-            <label style={{ display: 'block' }}>
-              <span style={{ color: '#ccc', display: 'block', marginBottom: '5px' }}>Venue Name *</span>
-              <input
-                ref={venueInputRef}
-                type="text"
-                required
-                value={venueQuery || formData.venue}
-                onChange={(e) => handleVenueChange(e.target.value)}
-                onFocus={() => venueQuery.length >= 2 && setShowVenueSuggestions(venueSuggestions.length > 0)}
-                onBlur={() => setTimeout(() => setShowVenueSuggestions(false), 200)}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  backgroundColor: '#1a1a1a',
-                  border: selectedVenue ? '1px solid #4CAF50' : '1px solid #444',
-                  borderRadius: '4px',
-                  color: '#fff',
-                }}
-                placeholder="Start typing venue name..."
-                autoComplete="off"
-              />
-              {selectedVenue && (
-                <span style={{ color: '#4CAF50', fontSize: '12px', marginTop: '4px', display: 'block' }}>
-                  Known venue - address auto-filled
-                </span>
-              )}
-            </label>
-
-            {/* Autocomplete Suggestions Dropdown */}
-            {showVenueSuggestions && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '100%',
-                  left: 0,
-                  right: 0,
-                  backgroundColor: '#1a1a1a',
-                  border: '1px solid #444',
-                  borderRadius: '0 0 4px 4px',
-                  zIndex: 1000,
-                  maxHeight: '250px',
-                  overflowY: 'auto',
-                }}
-              >
-                {venueSuggestions.map((venue, index) => (
-                  <div
-                    key={index}
-                    onClick={() => selectVenue(venue)}
-                    style={{
-                      padding: '12px 15px',
-                      cursor: 'pointer',
-                      borderBottom: index < venueSuggestions.length - 1 ? '1px solid #333' : 'none',
-                      transition: 'background-color 0.2s',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#2a2a2a')}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                  >
-                    <div style={{ color: '#fff', fontWeight: 'bold' }}>{venue.name}</div>
-                    <div style={{ color: '#888', fontSize: '12px', marginTop: '2px' }}>
-                      {venue.city}, {venue.country}
-                      {venue.capacity && ` - Capacity: ${venue.capacity.toLocaleString()}`}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <label style={{ display: 'block', marginBottom: '15px' }}>
-            <span style={{ color: '#ccc', display: 'block', marginBottom: '5px' }}>
-              Location / Address *
-              {selectedVenue && <span style={{ color: '#4CAF50', marginLeft: '10px' }}>(auto-filled)</span>}
-            </span>
-            <input
-              type="text"
-              required
-              value={formData.location}
-              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-              style={{
-                width: '100%',
-                padding: '10px',
-                backgroundColor: selectedVenue ? '#0d2818' : '#1a1a1a',
-                border: selectedVenue ? '1px solid #4CAF50' : '1px solid #444',
-                borderRadius: '4px',
-                color: '#fff',
-              }}
-              placeholder="123 Main St, New York, NY, USA"
-            />
-          </label>
-
-          {/* Duplicate Event Warning */}
-          {duplicateWarning && (
-            <div
-              style={{
-                padding: '15px',
-                backgroundColor: '#4d3a1a',
-                border: '1px solid #ffa726',
-                borderRadius: '4px',
-                marginBottom: '15px',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                <span style={{ fontSize: '20px' }}>Warning</span>
-                <div>
-                  <p style={{ color: '#ffa726', margin: 0, fontWeight: 'bold' }}>Possible Duplicate Event</p>
-                  <p style={{ color: '#ffcc80', margin: '5px 0 0 0', fontSize: '14px' }}>{duplicateWarning}</p>
-                </div>
-              </div>
-            </div>
-          )}
-          {isCheckingDuplicate && (
-            <p style={{ color: '#888', fontSize: '12px', marginBottom: '15px' }}>
-              Checking for similar events...
-            </p>
-          )}
-
-          <label style={{ display: 'block', marginBottom: '15px' }}>
-            <span style={{ color: '#ccc', display: 'block', marginBottom: '5px' }}>Banner Image URL</span>
-            <input
-              type="url"
-              value={formData.bannerImageUrl}
-              onChange={(e) => setFormData({ ...formData, bannerImageUrl: e.target.value })}
-              style={{
-                width: '100%',
-                padding: '10px',
-                backgroundColor: '#1a1a1a',
-                border: '1px solid #444',
-                borderRadius: '4px',
-                color: '#fff',
-              }}
-              placeholder="https://... or ipfs://..."
-            />
-            <span style={{ color: '#888', fontSize: '12px', marginTop: '4px', display: 'block' }}>
-              Supported: HTTPS URLs or IPFS (ipfs://...). Formats: JPG, PNG, GIF, WebP. Recommended: 1200x630px, max 5MB.
-            </span>
-          </label>
+      <div className="flex-1 overflow-y-auto">
+        <div className="p-8 border-b sticky top-0 bg-white/90 backdrop-blur-md z-10">
+          <p className="text-blue-600 font-bold text-xs uppercase tracking-[0.2em] mb-1">Organizer Portal</p>
+          <h2 className="text-3xl font-black text-slate-900 tracking-tight">Create Event</h2>
         </div>
 
-        {/* Ticket Tiers */}
-        <div style={{ marginBottom: '30px' }}>
-          <h3 style={{ color: '#fff', borderBottom: '1px solid #444', paddingBottom: '10px' }}>
-            Ticket Tiers
-          </h3>
+        <form onSubmit={handleSubmit} className="p-8 space-y-8">
+          {/* Event Details Section */}
+          <div>
+            <h3 className="text-sm font-black uppercase tracking-wider text-slate-400 mb-4">Event Details</h3>
 
-          {ticketTiers.map((tier, index) => (
-            <div
-              key={index}
-              style={{
-                backgroundColor: '#1a1a1a',
-                padding: '15px',
-                borderRadius: '4px',
-                marginBottom: '15px',
-                border: '1px solid #444',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <h4 style={{ color: '#4CAF50', margin: 0 }}>Tier {index + 1}</h4>
-                {ticketTiers.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeTicketTier(index)}
-                    style={{
-                      padding: '5px 10px',
-                      backgroundColor: '#ff6b6b',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <label style={{ display: 'block' }}>
-                  <span style={{ color: '#ccc', display: 'block', marginBottom: '5px' }}>Tier Name *</span>
-                  <input
-                    type="text"
-                    required
-                    value={tier.tierName}
-                    onChange={(e) => updateTicketTier(index, 'tierName', e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px',
-                      backgroundColor: '#2a2a2a',
-                      border: '1px solid #444',
-                      borderRadius: '4px',
-                      color: '#fff',
-                    }}
-                    placeholder="VIP, General, etc."
-                  />
-                </label>
-
-                <label style={{ display: 'block' }}>
-                  <span style={{ color: '#ccc', display: 'block', marginBottom: '5px' }}>Price (ADA) *</span>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    step="0.01"
-                    value={tier.priceAda}
-                    onChange={(e) => updateTicketTier(index, 'priceAda', e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px',
-                      backgroundColor: '#2a2a2a',
-                      border: '1px solid #444',
-                      borderRadius: '4px',
-                      color: '#fff',
-                    }}
-                  />
-                </label>
-
-                <label style={{ display: 'block' }}>
-                  <span style={{ color: '#ccc', display: 'block', marginBottom: '5px' }}>Total Supply *</span>
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    value={tier.totalSupply}
-                    onChange={(e) => updateTicketTier(index, 'totalSupply', e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px',
-                      backgroundColor: '#2a2a2a',
-                      border: '1px solid #444',
-                      borderRadius: '4px',
-                      color: '#fff',
-                    }}
-                  />
-                </label>
-
-                <label style={{ display: 'block' }}>
-                  <span style={{ color: '#ccc', display: 'block', marginBottom: '5px' }}>Max Per Wallet *</span>
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    value={tier.maxPerWallet}
-                    onChange={(e) => updateTicketTier(index, 'maxPerWallet', e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px',
-                      backgroundColor: '#2a2a2a',
-                      border: '1px solid #444',
-                      borderRadius: '4px',
-                      color: '#fff',
-                    }}
-                  />
-                </label>
-              </div>
-
-              <label style={{ display: 'block', marginTop: '10px' }}>
-                <span style={{ color: '#ccc', display: 'block', marginBottom: '5px' }}>Description</span>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Event Name *</label>
                 <input
                   type="text"
-                  value={tier.tierDescription}
-                  onChange={(e) => updateTicketTier(index, 'tierDescription', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '8px',
-                    backgroundColor: '#2a2a2a',
-                    border: '1px solid #444',
-                    borderRadius: '4px',
-                    color: '#fff',
-                  }}
-                  placeholder="Tier benefits..."
+                  required
+                  value={formData.eventName}
+                  onChange={(e) => setFormData({ ...formData, eventName: e.target.value })}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Summer Music Festival 2026"
                 />
-              </label>
-            </div>
-          ))}
+              </div>
 
-          <button
-            type="button"
-            onClick={addTicketTier}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: '#2196F3',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
-          >
-            + Add Another Tier
-          </button>
-        </div>
-
-        {/* Transaction Status Indicator */}
-        {isSubmitting && txStatus !== 'idle' && (
-          <div
-            style={{
-              padding: '20px',
-              backgroundColor: '#1a3d5c',
-              border: '1px solid #2196F3',
-              borderRadius: '4px',
-              marginBottom: '20px',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-              {/* Spinner */}
-              <div
-                style={{
-                  width: '24px',
-                  height: '24px',
-                  border: '3px solid #1a1a1a',
-                  borderTop: '3px solid #2196F3',
-                  borderRadius: '50%',
-                  animation: 'spin 1s linear infinite',
-                }}
-              />
               <div>
-                <p style={{ color: '#2196F3', margin: 0, fontWeight: 'bold' }}>
-                  {TX_STATUS_MESSAGES[txStatus]}
-                </p>
-                {txStatus === 'awaiting_signature' && (
-                  <p style={{ color: '#90caf9', margin: '5px 0 0 0', fontSize: '13px' }}>
-                    Check your wallet extension for the signature request
-                  </p>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Description</label>
+                <textarea
+                  value={formData.eventDescription}
+                  onChange={(e) => setFormData({ ...formData, eventDescription: e.target.value })}
+                  rows={3}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  placeholder="Describe your event..."
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Date & Time *</label>
+                  <input
+                    type="datetime-local"
+                    required
+                    min={getMinDateTime()}
+                    value={formData.eventDate}
+                    onChange={(e) => setFormData({ ...formData, eventDate: e.target.value as string })}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-slate-400 mt-1">Must be a future date</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Category *</label>
+                  <select
+                    required
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value as EventCreationParams['category'] })}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="concert">Concert</option>
+                    <option value="sports">Sports</option>
+                    <option value="theater">Theater</option>
+                    <option value="conference">Conference</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Venue Autocomplete */}
+              <div className="relative">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Venue Name *</label>
+                <input
+                  ref={venueInputRef}
+                  type="text"
+                  required
+                  value={venueQuery || formData.venue}
+                  onChange={(e) => handleVenueChange(e.target.value)}
+                  onFocus={() => venueQuery.length >= 2 && setShowVenueSuggestions(venueSuggestions.length > 0)}
+                  onBlur={() => setTimeout(() => setShowVenueSuggestions(false), 200)}
+                  className={`w-full px-4 py-3 bg-slate-50 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    selectedVenue ? 'border-green-500' : 'border-slate-200'
+                  }`}
+                  placeholder="Start typing venue name..."
+                  autoComplete="off"
+                />
+                {selectedVenue && (
+                  <p className="text-xs text-green-600 mt-1 font-medium">Known venue - address auto-filled</p>
                 )}
-                {txStatus === 'confirming' && (
-                  <p style={{ color: '#90caf9', margin: '5px 0 0 0', fontSize: '13px' }}>
-                    Transaction submitted. Waiting for blockchain confirmation...
-                  </p>
+
+                {showVenueSuggestions && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                    {venueSuggestions.map((venue, index) => (
+                      <div
+                        key={index}
+                        onClick={() => selectVenue(venue)}
+                        className="px-4 py-3 cursor-pointer hover:bg-slate-50 border-b border-slate-100 last:border-0"
+                      >
+                        <p className="font-semibold text-slate-900">{venue.name}</p>
+                        <p className="text-xs text-slate-500">{venue.city}, {venue.country} {venue.capacity && `• ${venue.capacity.toLocaleString()} capacity`}</p>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Location / Address *
+                  {selectedVenue && <span className="text-green-600 ml-2 text-xs">(auto-filled)</span>}
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.location}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  className={`w-full px-4 py-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    selectedVenue ? 'bg-green-50 border-green-500' : 'bg-slate-50 border-slate-200'
+                  }`}
+                  placeholder="123 Main St, New York, NY, USA"
+                />
+              </div>
+
+              {/* Duplicate Warning */}
+              {duplicateWarning && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                  <p className="text-amber-800 font-semibold text-sm">Possible Duplicate</p>
+                  <p className="text-amber-700 text-sm mt-1">{duplicateWarning}</p>
+                </div>
+              )}
+              {isCheckingDuplicate && <p className="text-xs text-slate-400">Checking for similar events...</p>}
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Banner Image URL</label>
+                <input
+                  type="url"
+                  value={formData.bannerImageUrl}
+                  onChange={(e) => setFormData({ ...formData, bannerImageUrl: e.target.value })}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="https://... or ipfs://..."
+                />
+                <p className="text-xs text-slate-400 mt-1">Recommended: 1200x630px, max 5MB. Formats: JPG, PNG, GIF, WebP</p>
+              </div>
             </div>
-
-            {/* Progress Steps */}
-            <div style={{ marginTop: '15px', display: 'flex', gap: '5px' }}>
-              {(['validating', 'building', 'awaiting_signature', 'submitting', 'confirming'] as TxStatus[]).map((step, index) => {
-                const currentIndex = ['validating', 'building', 'awaiting_signature', 'submitting', 'confirming'].indexOf(txStatus);
-                const stepIndex = index;
-                const isComplete = stepIndex < currentIndex;
-                const isCurrent = stepIndex === currentIndex;
-
-                return (
-                  <div
-                    key={step}
-                    style={{
-                      flex: 1,
-                      height: '4px',
-                      backgroundColor: isComplete ? '#4CAF50' : isCurrent ? '#2196F3' : '#333',
-                      borderRadius: '2px',
-                      transition: 'background-color 0.3s',
-                    }}
-                  />
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {error && (
-          <div
-            style={{
-              padding: '15px',
-              backgroundColor: '#4d1a1a',
-              border: '1px solid #ff6b6b',
-              borderRadius: '4px',
-              marginBottom: '20px',
-            }}
-          >
-            <p style={{ color: '#ff6b6b', margin: 0 }}>{error}</p>
-          </div>
-        )}
-
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          style={{
-            padding: '12px 30px',
-            backgroundColor: isSubmitting ? '#666' : '#4CAF50',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: isSubmitting ? 'not-allowed' : 'pointer',
-            fontSize: '16px',
-            fontWeight: 'bold',
-          }}
-        >
-          {isSubmitting ? 'Creating Event...' : 'Create Event'}
-        </button>
-
-        {/* CSS for spinner animation */}
-        <style>{`
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-        `}</style>
-          </form>
-        </div>
-      </div>
-
-      {/* Ticket Preview Panel */}
-      <div style={{ flex: '0 0 320px', minWidth: '280px' }}>
-        <div
-          style={{
-            position: 'sticky',
-            top: '20px',
-            backgroundColor: '#1a1a1a',
-            borderRadius: '8px',
-            border: '1px solid #444',
-            padding: '24px',
-          }}
-        >
-          <h3
-            style={{
-              color: '#94a3b8',
-              fontSize: '11px',
-              fontWeight: 800,
-              textTransform: 'uppercase',
-              letterSpacing: '2px',
-              marginTop: 0,
-              marginBottom: '20px',
-            }}
-          >
-            Ticket Preview
-          </h3>
-
-          <TicketPreview
-            eventName={formData.eventName}
-            venue={formData.venue}
-            eventDate={formData.eventDate}
-            tierName={ticketTiers[0]?.tierName || 'General Admission'}
-            tierType={getTierType(ticketTiers[0]?.tierName || '')}
-            priceAda={ticketTiers[0]?.priceAda || 0}
-            bannerImageUrl={formData.bannerImageUrl}
-            organizerName="You (Organizer)"
-          />
-
-          {/* Preview Info */}
-          <div
-            style={{
-              marginTop: '20px',
-              padding: '16px',
-              backgroundColor: '#0f172a',
-              borderRadius: '8px',
-              border: '1px dashed #334155',
-            }}
-          >
-            <p style={{ color: '#64748b', fontSize: '12px', margin: 0, lineHeight: 1.5 }}>
-              This is how your ticket will appear to buyers. The design updates as you fill in the form.
-            </p>
           </div>
 
-          {/* Multiple Tiers Info */}
-          {ticketTiers.length > 1 && (
-            <div style={{ marginTop: '16px' }}>
-              <p
-                style={{
-                  color: '#94a3b8',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  marginBottom: '8px',
-                }}
+          {/* Ticket Tiers Section */}
+          <div>
+            <h3 className="text-sm font-black uppercase tracking-wider text-slate-400 mb-4">Ticket Tiers</h3>
+
+            <div className="space-y-4">
+              {ticketTiers.map((tier, index) => (
+                <div key={index} className="bg-slate-50 rounded-2xl p-6 border border-slate-200">
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="font-bold text-slate-700">Tier {index + 1}</h4>
+                    {ticketTiers.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeTicketTier(index)}
+                        className="text-red-500 hover:text-red-700 text-sm font-medium"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1">Name *</label>
+                      <input
+                        type="text"
+                        required
+                        value={tier.tierName}
+                        onChange={(e) => updateTicketTier(index, 'tierName', e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="VIP, General, etc."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1">Price (ADA) *</label>
+                      <input
+                        type="number"
+                        required
+                        min="0"
+                        step="0.01"
+                        value={tier.priceAda}
+                        onChange={(e) => updateTicketTier(index, 'priceAda', e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1">Supply *</label>
+                      <input
+                        type="number"
+                        required
+                        min="1"
+                        value={tier.totalSupply}
+                        onChange={(e) => updateTicketTier(index, 'totalSupply', e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1">Max/Wallet *</label>
+                      <input
+                        type="number"
+                        required
+                        min="1"
+                        value={tier.maxPerWallet}
+                        onChange={(e) => updateTicketTier(index, 'maxPerWallet', e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <label className="block text-xs font-semibold text-slate-500 mb-1">Description</label>
+                    <input
+                      type="text"
+                      value={tier.tierDescription}
+                      onChange={(e) => updateTicketTier(index, 'tierDescription', e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Tier benefits..."
+                    />
+                  </div>
+                </div>
+              ))}
+
+              <button
+                type="button"
+                onClick={addTicketTier}
+                className="w-full py-3 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 font-semibold hover:border-blue-500 hover:text-blue-500 transition-colors"
               >
-                Other Tiers:
-              </p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {ticketTiers.slice(1).map((tier, index) => (
-                  <span
-                    key={index}
-                    style={{
-                      backgroundColor: '#1e293b',
-                      color: '#cbd5e1',
-                      padding: '4px 10px',
-                      borderRadius: '4px',
-                      fontSize: '11px',
-                      fontWeight: 500,
-                    }}
-                  >
-                    {tier.tierName || `Tier ${index + 2}`} - ₳{tier.priceAda}
-                  </span>
-                ))}
+                + Add Another Tier
+              </button>
+            </div>
+          </div>
+
+          {/* Transaction Status */}
+          {isSubmitting && txStatus !== 'idle' && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+              <div className="flex items-center gap-4">
+                <div className="w-6 h-6 border-2 border-slate-300 border-t-blue-600 rounded-full animate-spin" />
+                <div>
+                  <p className="font-bold text-blue-900">{TX_STATUS_MESSAGES[txStatus]}</p>
+                  {txStatus === 'awaiting_signature' && (
+                    <p className="text-sm text-blue-700 mt-1">Check your wallet extension</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="mt-4 flex gap-1">
+                {(['validating', 'building', 'awaiting_signature', 'submitting', 'confirming'] as TxStatus[]).map((step, index) => {
+                  const currentIndex = ['validating', 'building', 'awaiting_signature', 'submitting', 'confirming'].indexOf(txStatus);
+                  const isComplete = index < currentIndex;
+                  const isCurrent = index === currentIndex;
+
+                  return (
+                    <div
+                      key={step}
+                      className={`flex-1 h-1 rounded ${isComplete ? 'bg-green-500' : isCurrent ? 'bg-blue-500' : 'bg-slate-200'}`}
+                    />
+                  );
+                })}
               </div>
             </div>
           )}
-        </div>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+              <p className="text-red-700 font-medium">{error}</p>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full py-5 bg-slate-900 hover:bg-black text-white font-black text-lg rounded-2xl shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? 'Creating Event...' : 'Create Event'}
+          </button>
+        </form>
       </div>
+
+      {/* Preview Sidebar */}
+      <aside className="w-full lg:w-[400px] bg-slate-50 p-8 border-l border-slate-100 shrink-0 overflow-y-auto">
+        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 mb-6">Ticket Preview</h3>
+
+        <TicketPreview
+          eventName={formData.eventName}
+          venue={formData.venue}
+          eventDate={formData.eventDate}
+          tierName={ticketTiers[0]?.tierName || 'General Admission'}
+          tierType={getTierType(ticketTiers[0]?.tierName || '')}
+          priceAda={ticketTiers[0]?.priceAda || 0}
+          bannerImageUrl={formData.bannerImageUrl}
+          organizerName="You (Organizer)"
+        />
+
+        <div className="mt-6 p-4 bg-white rounded-xl border border-dashed border-slate-200">
+          <p className="text-slate-500 text-xs leading-relaxed">
+            This preview updates live as you fill in the form. The final ticket will include blockchain verification.
+          </p>
+        </div>
+
+        {ticketTiers.length > 1 && (
+          <div className="mt-6">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Other Tiers</p>
+            <div className="flex flex-wrap gap-2">
+              {ticketTiers.slice(1).map((tier, index) => (
+                <span
+                  key={index}
+                  className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-600"
+                >
+                  {tier.tierName || `Tier ${index + 2}`} - ₳{tier.priceAda}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </aside>
     </div>
   );
 };

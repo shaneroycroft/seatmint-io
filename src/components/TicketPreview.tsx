@@ -11,15 +11,14 @@ interface TicketPreviewProps {
   organizerName?: string;
 }
 
-// Color schemes for different ticket types
-const TIER_COLORS: Record<string, { bg: string; accent: string }> = {
-  general: { bg: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', accent: '#3b82f6' },
-  vip: { bg: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)', accent: '#8b5cf6' },
-  backstage: { bg: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)', accent: '#ef4444' },
-  default: { bg: 'linear-gradient(135deg, #10b981 0%, #047857 100%)', accent: '#10b981' },
+const TIER_COLORS: Record<string, { bg: string; gradient: string }> = {
+  general: { bg: 'bg-blue-600', gradient: 'from-blue-500 to-blue-700' },
+  vip: { bg: 'bg-purple-600', gradient: 'from-purple-500 to-purple-700' },
+  backstage: { bg: 'bg-red-600', gradient: 'from-red-500 to-red-700' },
+  default: { bg: 'bg-emerald-600', gradient: 'from-emerald-500 to-emerald-700' },
 };
 
-const getTierColor = (tierName: string, tierType?: string): { bg: string; accent: string } => {
+const getTierColor = (tierName: string, tierType?: string) => {
   if (tierType && TIER_COLORS[tierType]) {
     return TIER_COLORS[tierType];
   }
@@ -60,200 +59,79 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({
   const displayPrice = priceAda || 0;
 
   return (
-    <div style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div className="font-sans">
       {/* Ticket Card */}
       <div
-        style={{
-          background: bannerImageUrl ? `url(${bannerImageUrl}) center/cover` : colors.bg,
-          borderRadius: '16px',
-          padding: '20px',
-          aspectRatio: '16/9',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          color: 'white',
-          position: 'relative',
-          overflow: 'hidden',
-          boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
-          minHeight: '180px',
-        }}
+        className={`relative aspect-[16/9] rounded-2xl p-5 flex flex-col justify-between text-white overflow-hidden shadow-xl min-h-[180px] ${
+          bannerImageUrl ? '' : `bg-gradient-to-br ${colors.gradient}`
+        }`}
+        style={bannerImageUrl ? { background: `url(${bannerImageUrl}) center/cover` } : undefined}
       >
         {/* Background overlay for images */}
         {bannerImageUrl && (
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              background: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.4) 100%)',
-            }}
-          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />
         )}
 
         {/* Watermark */}
-        <div
-          style={{
-            position: 'absolute',
-            top: '-20px',
-            right: '-30px',
-            fontSize: '120px',
-            fontWeight: 900,
-            opacity: 0.08,
-            transform: 'rotate(12deg)',
-            userSelect: 'none',
-            pointerEvents: 'none',
-            letterSpacing: '-5px',
-          }}
-        >
+        <div className="absolute -top-5 -right-8 text-[120px] font-black opacity-[0.08] rotate-12 select-none pointer-events-none tracking-tighter">
           TICKET
         </div>
 
-        {/* Top Row - Tier Badge */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative', zIndex: 1 }}>
-          <div
-            style={{
-              background: 'rgba(255,255,255,0.2)',
-              backdropFilter: 'blur(10px)',
-              padding: '6px 12px',
-              borderRadius: '8px',
-              fontSize: '10px',
-              fontWeight: 800,
-              textTransform: 'uppercase',
-              letterSpacing: '2px',
-              fontStyle: 'italic',
-            }}
-          >
+        {/* Top Row - Badges */}
+        <div className="flex justify-between items-start relative z-10">
+          <div className="bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-lg text-[10px] font-extrabold uppercase tracking-widest italic">
             {displayTier}
           </div>
-
-          {/* NFT Badge */}
-          <div
-            style={{
-              background: 'rgba(255,255,255,0.15)',
-              backdropFilter: 'blur(10px)',
-              padding: '4px 8px',
-              borderRadius: '6px',
-              fontSize: '9px',
-              fontWeight: 700,
-              letterSpacing: '1px',
-            }}
-          >
+          <div className="bg-white/15 backdrop-blur-md px-2 py-1 rounded-md text-[9px] font-bold tracking-wide">
             NFT
           </div>
         </div>
 
         {/* Bottom Row - Event Info */}
-        <div style={{ position: 'relative', zIndex: 1 }}>
-          <h4
-            style={{
-              fontSize: '20px',
-              fontWeight: 900,
-              lineHeight: 1.2,
-              marginBottom: '4px',
-              textShadow: '0 2px 10px rgba(0,0,0,0.3)',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
+        <div className="relative z-10">
+          <h4 className="text-xl font-black leading-tight mb-1 truncate drop-shadow-lg">
             {displayName}
           </h4>
-          <p
-            style={{
-              fontSize: '12px',
-              fontWeight: 500,
-              opacity: 0.9,
-              textTransform: 'uppercase',
-              letterSpacing: '1px',
-            }}
-          >
+          <p className="text-xs font-medium opacity-90 uppercase tracking-wider">
             {displayVenue}
           </p>
         </div>
       </div>
 
       {/* Ticket Details Below Card */}
-      <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+      <div className="mt-4 flex justify-between items-end">
         <div>
-          <p
-            style={{
-              fontSize: '10px',
-              fontWeight: 700,
-              color: '#94a3b8',
-              textTransform: 'uppercase',
-              letterSpacing: '2px',
-              marginBottom: '4px',
-            }}
-          >
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
             {formatDate(eventDate)}
           </p>
-          <p style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>
+          <p className="text-sm font-semibold text-slate-600">
             {organizerName}
           </p>
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <p
-            style={{
-              fontSize: '24px',
-              fontWeight: 900,
-              color: '#0f172a',
-              letterSpacing: '-1px',
-            }}
-          >
+        <div className="text-right">
+          <p className="text-2xl font-black text-slate-900 tracking-tighter">
             ₳{displayPrice}
           </p>
         </div>
       </div>
 
       {/* Decorative Divider */}
-      <div
-        style={{
-          marginTop: '16px',
-          borderTop: '2px dashed #e2e8f0',
-          position: 'relative',
-        }}
-      >
+      <div className="mt-4 border-t-2 border-dashed border-slate-200 relative">
         {/* Notch Left */}
-        <div
-          style={{
-            position: 'absolute',
-            left: '-12px',
-            top: '-8px',
-            width: '16px',
-            height: '16px',
-            background: '#1a1a1a',
-            borderRadius: '50%',
-          }}
-        />
+        <div className="absolute -left-3 -top-2 w-4 h-4 bg-slate-50 rounded-full" />
         {/* Notch Right */}
-        <div
-          style={{
-            position: 'absolute',
-            right: '-12px',
-            top: '-8px',
-            width: '16px',
-            height: '16px',
-            background: '#1a1a1a',
-            borderRadius: '50%',
-          }}
-        />
+        <div className="absolute -right-3 -top-2 w-4 h-4 bg-slate-50 rounded-full" />
       </div>
 
       {/* Bottom Info */}
-      <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div
-            style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              background: '#10b981',
-            }}
-          />
-          <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 500 }}>
+      <div className="mt-4 flex justify-between items-center">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-emerald-500" />
+          <span className="text-[11px] text-slate-500 font-medium">
             Verified on Cardano
           </span>
         </div>
-        <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600, letterSpacing: '1px' }}>
+        <span className="text-[10px] text-slate-400 font-semibold tracking-wider">
           SEATMINT
         </span>
       </div>
@@ -267,50 +145,26 @@ export const TicketPreviewCompact: React.FC<TicketPreviewProps> = (props) => {
 
   return (
     <div
-      style={{
-        background: props.bannerImageUrl ? `url(${props.bannerImageUrl}) center/cover` : colors.bg,
-        borderRadius: '12px',
-        padding: '12px',
-        aspectRatio: '3/2',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-        color: 'white',
-        position: 'relative',
-        overflow: 'hidden',
-        minHeight: '100px',
-      }}
+      className={`relative aspect-[3/2] rounded-xl p-3 flex flex-col justify-between text-white overflow-hidden min-h-[100px] ${
+        props.bannerImageUrl ? '' : `bg-gradient-to-br ${colors.gradient}`
+      }`}
+      style={props.bannerImageUrl ? { background: `url(${props.bannerImageUrl}) center/cover` } : undefined}
     >
       {props.bannerImageUrl && (
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.1) 100%)',
-          }}
-        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-black/10" />
       )}
 
-      <div style={{ position: 'relative', zIndex: 1 }}>
-        <span
-          style={{
-            background: 'rgba(255,255,255,0.2)',
-            padding: '3px 8px',
-            borderRadius: '4px',
-            fontSize: '9px',
-            fontWeight: 700,
-            textTransform: 'uppercase',
-          }}
-        >
+      <div className="relative z-10">
+        <span className="bg-white/20 px-2 py-0.5 rounded text-[9px] font-bold uppercase">
           {props.tierName || 'General'}
         </span>
       </div>
 
-      <div style={{ position: 'relative', zIndex: 1 }}>
-        <p style={{ fontSize: '14px', fontWeight: 800, marginBottom: '2px' }}>
+      <div className="relative z-10">
+        <p className="text-sm font-extrabold mb-0.5 truncate">
           {props.eventName || 'Event Name'}
         </p>
-        <p style={{ fontSize: '10px', opacity: 0.8 }}>
+        <p className="text-[10px] opacity-80">
           {props.venue || 'Venue'}
         </p>
       </div>

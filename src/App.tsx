@@ -3,12 +3,7 @@ import { useLucid } from "./hooks/useLucid";
 import { useGenesis } from "./hooks/useGenesis";
 import { CreateEvent } from "./components/CreateEvent";
 import { TicketMarketplace } from "./components/TicketMarketplace";
-
-// Brand configuration - change name here when ready
-const BRAND = {
-  name: 'Seatmint', // TODO: Update with new brand name when available !!!
-  tagline: 'Cardano Ticketing Platform'
-};
+import { Layout } from "./components/layout";
 
 type AppTab = 'setup' | 'create-event' | 'marketplace';
 
@@ -37,238 +32,136 @@ export default function App() {
   const handleInitialize = async () => {
     if (lucid && address) {
       await initializePlatform(lucid, address);
-    } else {
-      alert('Please connect your wallet first!');
     }
   };
 
-  // Check if platform is ready for main features
   const isPlatformReady = isConnected && isInitialized && lucid && address;
 
   return (
-    <div style={{ padding: '40px', maxWidth: '1200px', margin: '0 auto', fontFamily: 'system-ui', backgroundColor: '#1a1a1a', minHeight: '100vh' }}>
-      <h1 style={{ color: '#fff', marginBottom: '20px' }}>🎫 {BRAND.name}</h1>
-
-      {/* Navigation Tabs */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '30px', flexWrap: 'wrap' }}>
-        <button
-          onClick={() => setActiveTab('setup')}
-          style={{
-            padding: '12px 24px',
-            backgroundColor: activeTab === 'setup' ? '#4CAF50' : '#2a2a2a',
-            color: '#fff',
-            border: activeTab === 'setup' ? '2px solid #4CAF50' : '1px solid #444',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '16px'
-          }}
-        >
-          ⚙️ Setup
-        </button>
-        <button
-          onClick={() => setActiveTab('create-event')}
-          disabled={!isPlatformReady}
-          style={{
-            padding: '12px 24px',
-            backgroundColor: activeTab === 'create-event' ? '#4CAF50' : '#2a2a2a',
-            color: '#fff',
-            border: activeTab === 'create-event' ? '2px solid #4CAF50' : '1px solid #444',
-            borderRadius: '4px',
-            cursor: isPlatformReady ? 'pointer' : 'not-allowed',
-            fontSize: '16px',
-            opacity: isPlatformReady ? 1 : 0.5
-          }}
-        >
-          🎪 Create Event
-        </button>
-        <button
-          onClick={() => setActiveTab('marketplace')}
-          disabled={!isPlatformReady}
-          style={{
-            padding: '12px 24px',
-            backgroundColor: activeTab === 'marketplace' ? '#4CAF50' : '#2a2a2a',
-            color: '#fff',
-            border: activeTab === 'marketplace' ? '2px solid #4CAF50' : '1px solid #444',
-            borderRadius: '4px',
-            cursor: isPlatformReady ? 'pointer' : 'not-allowed',
-            fontSize: '16px',
-            opacity: isPlatformReady ? 1 : 0.5
-          }}
-        >
-          🛒 Marketplace
-        </button>
-
-        {/* Wallet status indicator */}
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          {isConnected ? (
-            <>
-              <span style={{ color: '#4CAF50', fontSize: '14px' }}>
-                ✅ {address?.slice(0, 8)}...{address?.slice(-6)}
-              </span>
-              <button
-                onClick={disconnectWallet}
-                style={{
-                  padding: '8px 12px',
-                  backgroundColor: '#ff6b6b',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '12px'
-                }}
-              >
-                Disconnect
-              </button>
-            </>
-          ) : (
-            <span style={{ color: '#ff6b6b', fontSize: '14px' }}>⚠️ Wallet not connected</span>
-          )}
-        </div>
-      </div>
-
+    <Layout
+      isConnected={isConnected}
+      address={address ?? undefined}
+      onDisconnect={disconnectWallet}
+      activeTab={activeTab}
+      onTabChange={(tab) => setActiveTab(tab as AppTab)}
+      isPlatformReady={!!isPlatformReady}
+    >
       {/* Setup Tab */}
       {activeTab === 'setup' && (
-        <>
-          <div style={{ 
-        backgroundColor: '#2a2a2a', 
-        padding: '20px', 
-        borderRadius: '8px', 
-        marginBottom: '20px',
-        border: '1px solid #444'
-      }}>
-        <h2 style={{ color: '#fff', marginTop: 0 }}>Step 1: Connect Wallet</h2>
-        
-        {!isConnected ? (
-          <>
-            {availableWallets.length === 0 ? (
-              <p style={{ color: '#ff6b6b' }}>
-                ⚠️ No Cardano wallets detected. Please install a wallet extension.
-              </p>
-            ) : (
-              <div>
-                <p style={{ color: '#ccc' }}>Available wallets:</p>
-                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '10px' }}>
-                  {availableWallets.map((wallet) => (
-                    <button
-                      key={wallet}
-                      onClick={() => connectWallet(wallet)}
-                      disabled={isConnecting}
-                      style={{
-                        padding: '10px 20px',
-                        fontSize: '16px',
-                        cursor: isConnecting ? 'not-allowed' : 'pointer',
-                        backgroundColor: '#4CAF50',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        opacity: isConnecting ? 0.5 : 1
-                      }}
-                    >
-                      {wallet.charAt(0).toUpperCase() + wallet.slice(1)}
-                      {wallet === 'lace' && ' 🎴'}
-                    </button>
-                  ))}
+        <div className="h-full flex items-center justify-center p-8">
+          <div className="max-w-lg w-full space-y-6">
+            {/* Step 1: Connect Wallet */}
+            <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                  isConnected ? 'bg-green-500 text-white' : 'bg-slate-200 text-slate-600'
+                }`}>
+                  {isConnected ? '✓' : '1'}
                 </div>
+                <h2 className="text-xl font-bold text-slate-900">Connect Wallet</h2>
+              </div>
+
+              {!isConnected ? (
+                <>
+                  {availableWallets.length === 0 ? (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                      <p className="text-amber-800 font-medium">No wallets detected</p>
+                      <p className="text-amber-600 text-sm mt-1">
+                        Please install a Cardano wallet extension (Nami, Eternl, Lace, etc.)
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {availableWallets.map((wallet) => (
+                        <button
+                          key={wallet}
+                          onClick={() => connectWallet(wallet)}
+                          disabled={isConnecting}
+                          className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 rounded-xl transition-colors disabled:opacity-50"
+                        >
+                          <span className="font-semibold text-slate-700 capitalize">{wallet}</span>
+                          {isConnecting && (
+                            <span className="text-sm text-slate-500">Connecting...</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {walletError && (
+                    <div className="mt-4 bg-red-50 border border-red-200 rounded-xl p-4">
+                      <p className="text-red-700 text-sm">{walletError}</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-green-600">
+                    <div className="w-2 h-2 bg-green-500 rounded-full" />
+                    <span className="font-semibold">Connected</span>
+                  </div>
+                  <p className="text-xs font-mono text-slate-500 bg-slate-50 p-3 rounded-lg break-all">
+                    {address}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Step 2: Initialize Platform */}
+            <div className={`bg-white rounded-2xl shadow-xl border border-slate-100 p-8 transition-opacity ${
+              !isConnected ? 'opacity-50' : ''
+            }`}>
+              <div className="flex items-center gap-3 mb-6">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                  isInitialized ? 'bg-green-500 text-white' : 'bg-slate-200 text-slate-600'
+                }`}>
+                  {isInitialized ? '✓' : '2'}
+                </div>
+                <h2 className="text-xl font-bold text-slate-900">Initialize Platform</h2>
+              </div>
+
+              {!isConnected ? (
+                <p className="text-slate-500">Connect your wallet first</p>
+              ) : !isInitialized ? (
+                <>
+                  <p className="text-slate-600 mb-4">
+                    Create the genesis transaction to initialize the Seatmint platform on Preview testnet.
+                  </p>
+                  <button
+                    onClick={handleInitialize}
+                    disabled={isInitializing}
+                    className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isInitializing ? 'Initializing...' : 'Initialize Platform'}
+                  </button>
+
+                  {genesisError && (
+                    <div className="mt-4 bg-red-50 border border-red-200 rounded-xl p-4">
+                      <p className="text-red-700 text-sm">{genesisError}</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                  <p className="text-green-800 font-semibold mb-2">Platform Ready</p>
+                  <p className="text-xs font-mono text-green-700 break-all">
+                    {platformAddress}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Ready Message */}
+            {isPlatformReady && (
+              <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 text-white text-center">
+                <p className="font-bold text-lg mb-1">You're all set!</p>
+                <p className="text-blue-100 text-sm">
+                  Use the navigation above to create events or browse the marketplace.
+                </p>
               </div>
             )}
-            
-            {isConnecting && <p style={{ color: '#ffd700' }}>⏳ Connecting...</p>}
-            {walletError && <p style={{ color: '#ff6b6b' }}>❌ {walletError}</p>}
-          </>
-        ) : (
-          <div>
-            <p style={{ color: '#4CAF50', fontWeight: 'bold' }}>✅ Wallet Connected</p>
-            <p style={{ fontSize: '12px', wordBreak: 'break-all', fontFamily: 'monospace', color: '#aaa', backgroundColor: '#1a1a1a', padding: '10px', borderRadius: '4px' }}>
-              {address}
-            </p>
-            <button
-              onClick={disconnectWallet}
-              style={{
-                marginTop: '10px',
-                padding: '8px 16px',
-                fontSize: '14px',
-                cursor: 'pointer',
-                backgroundColor: '#ff6b6b',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px'
-              }}
-            >
-              Disconnect
-            </button>
           </div>
-        )}
-      </div>
-
-      <hr style={{ margin: '30px 0', borderColor: '#444' }} />
-
-      <div style={{ 
-        backgroundColor: '#2a2a2a', 
-        padding: '20px', 
-        borderRadius: '8px',
-        border: '1px solid #444',
-        opacity: !isConnected ? 0.5 : 1
-      }}>
-        <h2 style={{ color: '#fff', marginTop: 0 }}>Step 2: Initialize Platform (Genesis)</h2>
-        
-        {!isConnected ? (
-          <p style={{ color: '#999' }}>Connect your wallet first to initialize the platform.</p>
-        ) : !isInitialized ? (
-          <>
-            <p style={{ color: '#ccc' }}>Create the genesis transaction to initialize the Seatmint platform.</p>
-            <button
-              onClick={handleInitialize}
-              disabled={isInitializing}
-              style={{
-                marginTop: '10px',
-                padding: '12px 24px',
-                fontSize: '16px',
-                cursor: isInitializing ? 'not-allowed' : 'pointer',
-                backgroundColor: '#2196F3',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                opacity: isInitializing ? 0.5 : 1
-              }}
-            >
-              {isInitializing ? '⏳ Initializing...' : '🚀 Initialize Platform'}
-            </button>
-            
-            {genesisError && (
-              <p style={{ color: '#ff6b6b', marginTop: '10px' }}>❌ {genesisError}</p>
-            )}
-          </>
-        ) : (
-          <div style={{ 
-            backgroundColor: '#1a4d2e', 
-            padding: '15px', 
-            borderRadius: '4px',
-            border: '1px solid #4CAF50'
-          }}>
-            <p style={{ color: '#4CAF50', fontWeight: 'bold', marginBottom: '10px' }}>
-              ✅ Platform Initialized Successfully!
-            </p>
-            <p style={{ fontSize: '12px', wordBreak: 'break-all', fontFamily: 'monospace', color: '#a5d6a7' }}>
-              Platform Address: {platformAddress}
-            </p>
-          </div>
-        )}
-      </div>
-
-          {isPlatformReady && (
-            <div style={{
-              backgroundColor: '#1a4d2e',
-              padding: '15px',
-              borderRadius: '4px',
-              border: '1px solid #4CAF50',
-              marginTop: '20px'
-            }}>
-              <p style={{ margin: 0, fontSize: '14px', color: '#4CAF50' }}>
-                <strong>✅ Ready!</strong> <span style={{ color: '#a5d6a7' }}>Use the tabs above to create events or browse the marketplace.</span>
-              </p>
-            </div>
-          )}
-        </>
+        </div>
       )}
 
       {/* Create Event Tab */}
@@ -280,6 +173,6 @@ export default function App() {
       {activeTab === 'marketplace' && isPlatformReady && (
         <TicketMarketplace lucid={lucid} userAddress={address} />
       )}
-    </div>
+    </Layout>
   );
 }

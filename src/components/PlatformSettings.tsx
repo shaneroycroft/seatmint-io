@@ -25,7 +25,6 @@ export const PlatformSettings: React.FC<PlatformSettingsProps> = ({ lucid: _luci
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load current settings from database
   useEffect(() => {
     loadSettings();
   }, []);
@@ -53,23 +52,19 @@ export const PlatformSettings: React.FC<PlatformSettingsProps> = ({ lucid: _luci
     }
   };
 
-  // Update platform fee
   const updateFee = async (newFeePercent: number) => {
     setUpdating(true);
     setError(null);
 
     try {
-      // TODO: Build and submit transaction to update settings on-chain
       console.log('Updating fee to:', newFeePercent);
-      
-      // Update database
+
       await supabase
         .from('platform_config')
         .update({ platform_fee_percentage: newFeePercent })
         .eq('platform_address', settings?.platformTreasury);
 
       await loadSettings();
-      alert('✅ Platform fee updated successfully!');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update fee');
     } finally {
@@ -77,10 +72,9 @@ export const PlatformSettings: React.FC<PlatformSettingsProps> = ({ lucid: _luci
     }
   };
 
-  // Emergency market toggle
   const toggleMarket = async () => {
     const action = settings?.isMarketActive ? 'STOP' : 'START';
-    
+
     if (!confirm(`Are you sure you want to ${action} the market?`)) {
       return;
     }
@@ -90,18 +84,14 @@ export const PlatformSettings: React.FC<PlatformSettingsProps> = ({ lucid: _luci
 
     try {
       const newStatus = !settings?.isMarketActive;
-      
-      // TODO: Build and submit transaction to toggle market on-chain
       console.log('Toggling market to:', newStatus);
-      
-      // Update database
+
       await supabase
         .from('platform_config')
         .update({ is_active: newStatus })
         .eq('platform_address', settings?.platformTreasury);
 
       await loadSettings();
-      alert(`✅ Market ${newStatus ? 'activated' : 'stopped'} successfully!`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to toggle market');
     } finally {
@@ -109,22 +99,19 @@ export const PlatformSettings: React.FC<PlatformSettingsProps> = ({ lucid: _luci
     }
   };
 
-  // Update supply limit
   const updateSupply = async (newSupply: number) => {
     setUpdating(true);
     setError(null);
 
     try {
-      // TODO: Build and submit transaction
       console.log('Updating max supply to:', newSupply);
-      
+
       await supabase
         .from('platform_config')
         .update({ max_supply: newSupply })
         .eq('platform_address', settings?.platformTreasury);
 
       await loadSettings();
-      alert('✅ Supply limit updated successfully!');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update supply');
     } finally {
@@ -134,244 +121,183 @@ export const PlatformSettings: React.FC<PlatformSettingsProps> = ({ lucid: _luci
 
   if (loading) {
     return (
-      <div style={{ padding: '40px', color: '#fff' }}>
-        <p>Loading settings...</p>
+      <div className="h-full flex items-center justify-center">
+        <div className="text-slate-500">Loading settings...</div>
       </div>
     );
   }
 
   if (!settings) {
     return (
-      <div style={{ padding: '40px', color: '#ff6b6b' }}>
-        <p>Failed to load platform settings</p>
+      <div className="h-full flex items-center justify-center">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+          <p className="text-red-700 font-medium">Failed to load platform settings</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: '40px', maxWidth: '1000px', margin: '0 auto' }}>
-      <h1 style={{ color: '#fff', marginBottom: '30px' }}>⚙️ Platform Settings</h1>
+    <div className="h-full overflow-y-auto bg-white">
+      {/* Header */}
+      <div className="p-8 border-b sticky top-0 bg-white/90 backdrop-blur-md z-10">
+        <p className="text-purple-600 font-bold text-xs uppercase tracking-[0.2em] mb-1">Admin Panel</p>
+        <h2 className="text-3xl font-black text-slate-900 tracking-tight">Platform Settings</h2>
+      </div>
 
-      {error && (
-        <div style={{
-          padding: '15px',
-          backgroundColor: '#4d1a1a',
-          border: '1px solid #ff6b6b',
-          borderRadius: '8px',
-          marginBottom: '20px',
-          color: '#ff6b6b'
-        }}>
-          {error}
-        </div>
-      )}
-
-      {/* Market Status */}
-      <div style={{
-        backgroundColor: '#2a2a2a',
-        padding: '20px',
-        borderRadius: '8px',
-        marginBottom: '20px',
-        border: '1px solid #444'
-      }}>
-        <h2 style={{ color: '#fff', marginTop: 0 }}>🚦 Market Status</h2>
-        
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <div style={{
-            fontSize: '48px',
-            color: settings.isMarketActive ? '#4CAF50' : '#ff6b6b'
-          }}>
-            {settings.isMarketActive ? '🟢' : '🔴'}
+      <div className="p-8 max-w-4xl mx-auto space-y-6">
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+            <p className="text-red-700 font-medium">{error}</p>
           </div>
-          
-          <div>
-            <p style={{ color: '#ccc', margin: 0 }}>
-              Market is currently <strong style={{ 
-                color: settings.isMarketActive ? '#4CAF50' : '#ff6b6b' 
-              }}>
+        )}
+
+        {/* Market Status Card */}
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">Market Status</h3>
+              <p className="text-sm text-slate-500">Control the marketplace activity</p>
+            </div>
+            <div className={`w-4 h-4 rounded-full ${settings.isMarketActive ? 'bg-green-500' : 'bg-red-500'}`} />
+          </div>
+
+          <div className="flex items-center gap-6 mb-6">
+            <div className={`text-6xl ${settings.isMarketActive ? 'text-green-500' : 'text-red-500'}`}>
+              {settings.isMarketActive ? '●' : '●'}
+            </div>
+            <div>
+              <p className={`text-2xl font-black ${settings.isMarketActive ? 'text-green-600' : 'text-red-600'}`}>
                 {settings.isMarketActive ? 'ACTIVE' : 'STOPPED'}
-              </strong>
-            </p>
-            <p style={{ color: '#888', fontSize: '14px', margin: '5px 0 0 0' }}>
-              {settings.isMarketActive 
-                ? 'All ticket sales are enabled' 
-                : 'All ticket sales are paused (emergency stop)'}
-            </p>
+              </p>
+              <p className="text-slate-500 text-sm">
+                {settings.isMarketActive
+                  ? 'All ticket sales and transfers are enabled'
+                  : 'All marketplace activity is paused'}
+              </p>
+            </div>
           </div>
+
+          <button
+            onClick={toggleMarket}
+            disabled={updating}
+            className={`w-full py-4 rounded-xl font-bold text-white transition-all disabled:opacity-50 ${
+              settings.isMarketActive
+                ? 'bg-red-500 hover:bg-red-600'
+                : 'bg-green-500 hover:bg-green-600'
+            }`}
+          >
+            {updating ? 'Updating...' : settings.isMarketActive ? 'Emergency Stop Market' : 'Activate Market'}
+          </button>
         </div>
 
-        <button
-          onClick={toggleMarket}
-          disabled={updating}
-          style={{
-            marginTop: '15px',
-            padding: '12px 24px',
-            backgroundColor: settings.isMarketActive ? '#ff6b6b' : '#4CAF50',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: updating ? 'not-allowed' : 'pointer',
-            fontSize: '16px',
-            fontWeight: 'bold',
-            opacity: updating ? 0.5 : 1
-          }}
-        >
-          {updating ? 'Updating...' : (settings.isMarketActive ? '🛑 EMERGENCY STOP' : '▶️ START MARKET')}
-        </button>
-      </div>
-
-      {/* Platform Fee */}
-      <div style={{
-        backgroundColor: '#2a2a2a',
-        padding: '20px',
-        borderRadius: '8px',
-        marginBottom: '20px',
-        border: '1px solid #444'
-      }}>
-        <h2 style={{ color: '#fff', marginTop: 0 }}>💰 Platform Fee</h2>
-        
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <div style={{ flex: 1 }}>
-            <p style={{ color: '#ccc', fontSize: '32px', fontWeight: 'bold', margin: 0 }}>
-              {settings.platformFeePercent}%
-            </p>
-            <p style={{ color: '#888', fontSize: '14px', margin: '5px 0 0 0' }}>
-              Current platform fee on all ticket sales
-            </p>
+        {/* Platform Fee Card */}
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">Platform Fee</h3>
+              <p className="text-sm text-slate-500">Fee charged on all ticket sales</p>
+            </div>
           </div>
-          
-          <div style={{ flex: 1 }}>
-            <label style={{ color: '#ccc', display: 'block', marginBottom: '10px' }}>
-              New fee percentage:
-            </label>
-            <input
-              type="number"
-              min="0"
-              max="10"
-              step="0.5"
-              defaultValue={settings.platformFeePercent}
-              onBlur={(e) => {
-                const newFee = parseFloat(e.target.value);
-                if (newFee !== settings.platformFeePercent && newFee >= 0 && newFee <= 10) {
-                  if (confirm(`Update platform fee to ${newFee}%?`)) {
-                    updateFee(newFee);
+
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <p className="text-sm text-slate-500 mb-2">Current Fee</p>
+              <p className="text-5xl font-black text-slate-900">{settings.platformFeePercent}%</p>
+            </div>
+
+            <div>
+              <label className="block text-sm text-slate-500 mb-2">Update Fee</label>
+              <input
+                type="number"
+                min="0"
+                max="10"
+                step="0.5"
+                defaultValue={settings.platformFeePercent}
+                onBlur={(e) => {
+                  const newFee = parseFloat(e.target.value);
+                  if (newFee !== settings.platformFeePercent && newFee >= 0 && newFee <= 10) {
+                    if (confirm(`Update platform fee to ${newFee}%?`)) {
+                      updateFee(newFee);
+                    }
                   }
-                }
-              }}
-              style={{
-                width: '100%',
-                padding: '10px',
-                backgroundColor: '#1a1a1a',
-                border: '1px solid #444',
-                borderRadius: '4px',
-                color: '#fff',
-                fontSize: '16px'
-              }}
-            />
-            <p style={{ color: '#888', fontSize: '12px', margin: '5px 0 0 0' }}>
-              Max 10% | Changes limited to 2% per update
-            </p>
+                }}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="text-xs text-slate-400 mt-2">Max 10% | Changes limited to 2% per update</p>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Supply Limit */}
-      <div style={{
-        backgroundColor: '#2a2a2a',
-        padding: '20px',
-        borderRadius: '8px',
-        marginBottom: '20px',
-        border: '1px solid #444'
-      }}>
-        <h2 style={{ color: '#fff', marginTop: 0 }}>🎫 Global Supply Limit</h2>
-        
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <div style={{ flex: 1 }}>
-            <p style={{ color: '#ccc', fontSize: '32px', fontWeight: 'bold', margin: 0 }}>
-              {settings.currentMaxSupply.toLocaleString()}
-            </p>
-            <p style={{ color: '#888', fontSize: '14px', margin: '5px 0 0 0' }}>
-              Maximum tickets per event
-            </p>
+        {/* Supply Limit Card */}
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">Global Supply Limit</h3>
+              <p className="text-sm text-slate-500">Maximum tickets per event</p>
+            </div>
           </div>
-          
-          <div style={{ flex: 1 }}>
-            <label style={{ color: '#ccc', display: 'block', marginBottom: '10px' }}>
-              New supply limit:
-            </label>
-            <input
-              type="number"
-              min="1"
-              step="100"
-              defaultValue={settings.currentMaxSupply}
-              onBlur={(e) => {
-                const newSupply = parseInt(e.target.value);
-                if (newSupply !== settings.currentMaxSupply && newSupply > 0) {
-                  if (confirm(`Update max supply to ${newSupply.toLocaleString()} tickets?`)) {
-                    updateSupply(newSupply);
+
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <p className="text-sm text-slate-500 mb-2">Current Limit</p>
+              <p className="text-5xl font-black text-slate-900">{settings.currentMaxSupply.toLocaleString()}</p>
+            </div>
+
+            <div>
+              <label className="block text-sm text-slate-500 mb-2">Update Limit</label>
+              <input
+                type="number"
+                min="1"
+                step="100"
+                defaultValue={settings.currentMaxSupply}
+                onBlur={(e) => {
+                  const newSupply = parseInt(e.target.value);
+                  if (newSupply !== settings.currentMaxSupply && newSupply > 0) {
+                    if (confirm(`Update max supply to ${newSupply.toLocaleString()} tickets?`)) {
+                      updateSupply(newSupply);
+                    }
                   }
-                }
-              }}
-              style={{
-                width: '100%',
-                padding: '10px',
-                backgroundColor: '#1a1a1a',
-                border: '1px solid #444',
-                borderRadius: '4px',
-                color: '#fff',
-                fontSize: '16px'
-              }}
-            />
+                }}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Resale Multiplier */}
-      <div style={{
-        backgroundColor: '#2a2a2a',
-        padding: '20px',
-        borderRadius: '8px',
-        marginBottom: '20px',
-        border: '1px solid #444'
-      }}>
-        <h2 style={{ color: '#fff', marginTop: 0 }}>🔄 Anti-Scalping (Resale Limit)</h2>
-        
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <div style={{ flex: 1 }}>
-            <p style={{ color: '#ccc', fontSize: '32px', fontWeight: 'bold', margin: 0 }}>
-              {settings.maxResaleMultiplier / 100}x
-            </p>
-            <p style={{ color: '#888', fontSize: '14px', margin: '5px 0 0 0' }}>
-              Maximum resale price multiplier
-            </p>
-            <p style={{ color: '#666', fontSize: '12px', margin: '5px 0 0 0' }}>
-              Example: 50 ADA ticket → Max resale {(50 * settings.maxResaleMultiplier / 100).toFixed(0)} ADA
+        {/* Resale Multiplier Card */}
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">Anti-Scalping Limit</h3>
+              <p className="text-sm text-slate-500">Maximum resale price multiplier</p>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-sm text-slate-500 mb-2">Current Multiplier</p>
+            <p className="text-5xl font-black text-slate-900">{settings.maxResaleMultiplier / 100}x</p>
+            <p className="text-slate-500 text-sm mt-2">
+              Example: A 50 ADA ticket can be resold for max {(50 * settings.maxResaleMultiplier / 100).toFixed(0)} ADA
             </p>
           </div>
         </div>
-      </div>
 
-      {/* Treasury Address */}
-      <div style={{
-        backgroundColor: '#2a2a2a',
-        padding: '20px',
-        borderRadius: '8px',
-        border: '1px solid #444'
-      }}>
-        <h2 style={{ color: '#fff', marginTop: 0 }}>🏦 Platform Treasury</h2>
-        <p style={{ 
-          color: '#aaa', 
-          fontSize: '14px', 
-          wordBreak: 'break-all',
-          fontFamily: 'monospace',
-          backgroundColor: '#1a1a1a',
-          padding: '10px',
-          borderRadius: '4px'
-        }}>
-          {settings.platformTreasury}
-        </p>
-        <p style={{ color: '#888', fontSize: '12px', margin: '10px 0 0 0' }}>
-          All platform fees are sent to this address
-        </p>
+        {/* Treasury Card */}
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">Platform Treasury</h3>
+              <p className="text-sm text-slate-500">Address receiving platform fees</p>
+            </div>
+          </div>
+
+          <div className="bg-slate-50 rounded-xl p-4">
+            <p className="text-xs font-mono text-slate-700 break-all">
+              {settings.platformTreasury}
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
