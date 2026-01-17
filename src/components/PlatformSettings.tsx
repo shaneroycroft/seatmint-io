@@ -1,10 +1,5 @@
 import { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_API_KEY
-);
+import { supabase } from '../lib/supabase';
 
 interface PlatformSettingsProps {
   lucid: any;

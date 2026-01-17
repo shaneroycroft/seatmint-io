@@ -9,6 +9,7 @@ interface LayoutProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
   isPlatformReady: boolean;
+  isOrganizer?: boolean;
 }
 
 export const Layout: React.FC<LayoutProps> = ({
@@ -19,6 +20,7 @@ export const Layout: React.FC<LayoutProps> = ({
   activeTab,
   onTabChange,
   isPlatformReady,
+  isOrganizer = false,
 }) => {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900">
@@ -29,6 +31,7 @@ export const Layout: React.FC<LayoutProps> = ({
         activeTab={activeTab}
         onTabChange={onTabChange}
         isPlatformReady={isPlatformReady}
+        isOrganizer={isOrganizer}
       />
       <main className="flex-1 overflow-hidden">
         {children}

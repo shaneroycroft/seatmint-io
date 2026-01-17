@@ -11,9 +11,11 @@ import {
   mintingPolicyToId,
   validatorToAddress,
   getAddressDetails,
-  scriptFromNative
+  scriptFromNative,
+  credentialToAddress,
+  keyHashToCredential,
 } from '@lucid-evolution/lucid';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabase';
 import {
   EVENT_MINT_VALIDATOR,
   PRIMARY_SALE_VALIDATOR,
@@ -22,11 +24,6 @@ import {
   applyPrimarySaleParams,
   applyStorefrontParams,
 } from '../utils/plutusScripts';
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_API_KEY
-);
 
 /**
  * SEATMINT TICKET SERVICE - Lucid Evolution Integration
@@ -79,12 +76,12 @@ const SaleRedeemerSchema = Data.Object({
 });
 type SaleRedeemer = Data.Static<typeof SaleRedeemerSchema>;
 
-// MintAction schema
-const MintActionSchema = Data.Enum([
+// MintAction schema (kept for reference - using Constr directly)
+const _MintActionSchema = Data.Enum([
   Data.Literal("Mint"),
   Data.Literal("Burn"),
 ]);
-type MintAction = Data.Static<typeof MintActionSchema>;
+void _MintActionSchema;
 
 // TicketDatum schema (secondary market listings)
 const TicketDatumSchema = Data.Object({
@@ -116,6 +113,14 @@ function dateToPosixTime(date: Date): bigint {
  */
 function adaToLovelace(ada: number): bigint {
   return BigInt(Math.floor(ada * 1_000_000));
+}
+
+/**
+ * Convert payment key hash (hex) to bech32 address
+ */
+function pkhToAddress(pkh: string, network: 'Mainnet' | 'Preprod' | 'Preview' | 'Custom'): string {
+  const credential = keyHashToCredential(pkh);
+  return credentialToAddress(network, credential);
 }
 
 /**
@@ -396,10 +401,7 @@ export async function purchaseTickets(
     buyer_pkh: buyerPKH,
   };
 
-  // Step 8: Build mint redeemer
-  const mintRedeemer = "Mint" as MintAction;
-
-  // Step 9: Build minting assets
+  // Step 8: Build minting assets
   const mintAssets: Record<string, bigint> = {};
   ticketNames.forEach(name => {
     mintAssets[toUnit(tier.events.event_policy_id, name)] = 1n;
@@ -425,21 +427,30 @@ export async function purchaseTickets(
   );
 
   // Step 13: Build transaction
+  // Redeemer: Constr with index 0 for primary sale purchase
+  const saleRedeemerData = new Constr(0, [
+    saleRedeemer.quantity,
+    saleRedeemer.payment_amount,
+    saleRedeemer.buyer_pkh,
+  ]);
+  // Mint redeemer: Constr 0 for Mint
+  const mintRedeemerData = new Constr(0, []);
+
   const tx = await lucid
     .newTx()
     .collectFrom(
       [saleUTxO],
-      Data.to<SaleRedeemer>(saleRedeemer)
+      Data.to(saleRedeemerData)
     )
     .readFrom([settingsUTxO])
     .mintAssets(
       mintAssets,
-      Data.to<MintAction>(mintRedeemer)
+      Data.to(mintRedeemerData)
     )
     .pay.ToAddress(tier.events.organizer_wallet_address, {
       lovelace: organizerPayment
     })
-    .pay.ToAddress(settings.platform_treasury, {
+    .pay.ToAddress(pkhToAddress(settings.platform_treasury, network), {
       lovelace: platformFee
     })
     .pay.ToAddressWithData(
@@ -529,7 +540,19 @@ export async function listTicketForResale(
     event_id: fromText(params.eventId),
     seat_number: null,
   };
-  const ticketDatum = Data.to<TicketDatum>(ticketDatumValue);
+  // Convert to Constr format for Lucid
+  const ticketDatumConstr = new Constr(0, [
+    ticketDatumValue.event_policy,
+    ticketDatumValue.token_name,
+    ticketDatumValue.original_mint_price,
+    ticketDatumValue.price,
+    ticketDatumValue.artist,
+    ticketDatumValue.royalty_rate,
+    ticketDatumValue.seller,
+    ticketDatumValue.event_id,
+    ticketDatumValue.seat_number === null ? new Constr(1, []) : new Constr(0, [ticketDatumValue.seat_number]),
+  ]);
+  const ticketDatum = Data.to(ticketDatumConstr);
 
   // Apply parameters to storefront validator
   const storefrontValidator = applyStorefrontParams(settings.platform_treasury);
@@ -564,15 +587,25 @@ export async function listTicketForResale(
     status: 'active',
   });
 
+  // Also update the tickets table so UI can track listing status
+  await supabase
+    .from('tickets')
+    .update({
+      status: 'listed',
+      resale_price: Math.floor(params.priceAda * 1_000_000),
+      listing_utxo_ref: listingRef,
+    })
+    .eq('nft_asset_name', params.ticketAssetName);
+
   return { txHash, listingUTxORef: listingRef };
 }
 
-// StorefrontRedeemer schema
-const StorefrontRedeemerSchema = Data.Enum([
+// StorefrontRedeemer schema (kept for reference - using Constr directly)
+const _StorefrontRedeemerSchema = Data.Enum([
   Data.Literal("Buy"),
   Data.Literal("Cancel"),
 ]);
-type StorefrontRedeemer = Data.Static<typeof StorefrontRedeemerSchema>;
+void _StorefrontRedeemerSchema;
 
 export interface PurchaseStorefrontParams {
   listingUtxoRef: string;  // txHash#outputIndex
@@ -624,8 +657,8 @@ export async function purchaseFromStorefront(
   const platformFee = (salePrice * BigInt(settings.platform_fee_bps)) / 10000n;
   const sellerPayout = salePrice - royaltyAmount - platformFee;
 
-  // Build Buy redeemer
-  const buyRedeemer = "Buy" as StorefrontRedeemer;
+  // Build Buy redeemer: Constr 0 for Buy action
+  const buyRedeemerData = new Constr(0, []);
 
   // Get NFT unit from listing
   const nftAssets = Object.entries(listingUtxo.assets).filter(
@@ -639,19 +672,24 @@ export async function purchaseFromStorefront(
   if (!network) throw new Error('Network not configured');
 
   // Build transaction
+  // Convert PKHs to addresses
+  const sellerAddr = pkhToAddress(ticketDatum.seller, network);
+  const artistAddr = pkhToAddress(ticketDatum.artist, network);
+  const treasuryAddr = pkhToAddress(settings.platform_treasury, network);
+
   const tx = await lucid
     .newTx()
     .collectFrom(
       [listingUtxo],
-      Data.to<StorefrontRedeemer>(buyRedeemer)
+      Data.to(buyRedeemerData)
     )
     .readFrom([settingsUTxO])
     // Pay seller
-    .pay.ToAddress(ticketDatum.seller, { lovelace: sellerPayout })
+    .pay.ToAddress(sellerAddr, { lovelace: sellerPayout })
     // Pay artist royalty
-    .pay.ToAddress(ticketDatum.artist, { lovelace: royaltyAmount })
+    .pay.ToAddress(artistAddr, { lovelace: royaltyAmount })
     // Pay platform fee
-    .pay.ToAddress(settings.platform_treasury, { lovelace: platformFee })
+    .pay.ToAddress(treasuryAddr, { lovelace: platformFee })
     // Send NFT to buyer
     .pay.ToAddress(buyerAddress, listingUtxo.assets)
     .attach.SpendingValidator(storefrontValidator)
@@ -676,8 +714,9 @@ export async function purchaseFromStorefront(
       current_owner_address: buyerAddress,
       status: 'minted',
       resale_price: null,
+      listing_utxo_ref: null,
     })
-    .eq('event_id', params.eventId);
+    .eq('listing_utxo_ref', params.listingUtxoRef);
 
   return { txHash: submittedTxHash };
 }
@@ -729,8 +768,8 @@ export async function cancelStorefrontListing(
     throw new Error('Only the seller can cancel this listing');
   }
 
-  // Build Cancel redeemer
-  const cancelRedeemer = "Cancel" as StorefrontRedeemer;
+  // Build Cancel redeemer: Constr 1 for Cancel action
+  const cancelRedeemerData = new Constr(1, []);
 
   const network = lucid.config().network;
   if (!network) throw new Error('Network not configured');
@@ -740,7 +779,7 @@ export async function cancelStorefrontListing(
     .newTx()
     .collectFrom(
       [listingUtxo],
-      Data.to<StorefrontRedeemer>(cancelRedeemer)
+      Data.to(cancelRedeemerData)
     )
     .readFrom([settingsUTxO])
     .pay.ToAddress(sellerAddress, listingUtxo.assets)
@@ -762,7 +801,7 @@ export async function cancelStorefrontListing(
 
   await supabase
     .from('tickets')
-    .update({ status: 'minted', resale_price: null })
+    .update({ status: 'minted', resale_price: null, listing_utxo_ref: null })
     .eq('id', params.ticketId);
 
   return { txHash: submittedTxHash };
@@ -881,7 +920,9 @@ async function saveEventToDatabase(
   organizerAddress: string,
   params: EventCreationParams
 ) {
-  await supabase.from('events').insert({
+  console.log('Saving event to database:', { eventId, policyId, organizerAddress });
+
+  const { error: eventError } = await supabase.from('events').insert({
     id: eventId,
     event_name: params.eventName,
     event_description: params.eventDescription,
@@ -891,9 +932,16 @@ async function saveEventToDatabase(
     organizer_wallet_address: organizerAddress,
     banner_image_url: params.bannerImageUrl,
     category: params.category,
-    status: 'active',
+    status: 'draft',  // Events start as draft, organizer must "Go Live" from dashboard
     event_policy_id: policyId,
   });
+
+  if (eventError) {
+    console.error('Failed to save event:', eventError);
+    throw new Error(`Failed to save event to database: ${eventError.message}`);
+  }
+
+  console.log('Event saved, now saving tiers...');
 
   const tiersToInsert = params.ticketTiers.map(tier => ({
     event_id: eventId,
@@ -905,7 +953,14 @@ async function saveEventToDatabase(
     max_per_wallet: tier.maxPerWallet,
   }));
 
-  await supabase.from('ticket_tiers').insert(tiersToInsert);
+  const { error: tiersError } = await supabase.from('ticket_tiers').insert(tiersToInsert);
+
+  if (tiersError) {
+    console.error('Failed to save ticket tiers:', tiersError);
+    throw new Error(`Failed to save ticket tiers: ${tiersError.message}`);
+  }
+
+  console.log('Event and tiers saved successfully');
 }
 
 async function recordTicketPurchase(

@@ -1,16 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabase';
 import {
   listTicketForResale,
   purchaseFromStorefront,
   cancelStorefrontListing,
   transferTicket,
 } from '../services/ticketService';
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_API_KEY
-);
 
 interface Ticket {
   id: string;
@@ -59,6 +54,8 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
   const [loading, setLoading] = useState(true);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [isPurchasing, setIsPurchasing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [actionInProgress, setActionInProgress] = useState<string | null>(null);
 
   const platformFeePercent = 2;
 
@@ -128,6 +125,8 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
   };
 
   const handleListTicketForSale = async (ticket: Ticket, priceAda: number) => {
+    setError(null);
+    setActionInProgress('listing');
     try {
       console.log('Listing ticket:', ticket.id, 'for', priceAda, 'ADA');
       const result = await listTicketForResale(lucid, {
@@ -139,10 +138,15 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
       loadData();
     } catch (err) {
       console.error(err);
+      setError(err instanceof Error ? err.message : 'Failed to list ticket');
+    } finally {
+      setActionInProgress(null);
     }
   };
 
   const handleCancelListing = async (ticket: Ticket) => {
+    setError(null);
+    setActionInProgress('canceling');
     try {
       if (!ticket.listing_utxo_ref) {
         throw new Error('No listing UTxO reference found');
@@ -156,12 +160,16 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
       loadData();
     } catch (err) {
       console.error(err);
+      setError(err instanceof Error ? err.message : 'Failed to cancel listing');
+    } finally {
+      setActionInProgress(null);
     }
   };
 
   const handlePurchaseTicket = async (ticket: Ticket) => {
     if (!ticket.resale_price || !ticket.listing_utxo_ref) return;
 
+    setError(null);
     setIsPurchasing(true);
     try {
       console.log('Purchasing ticket:', ticket.id);
@@ -174,12 +182,15 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
       loadData();
     } catch (err) {
       console.error(err);
+      setError(err instanceof Error ? err.message : 'Failed to purchase ticket');
     } finally {
       setIsPurchasing(false);
     }
   };
 
   const handleTransferTicket = async (ticket: Ticket, recipientAddress: string) => {
+    setError(null);
+    setActionInProgress('transferring');
     try {
       console.log('Transferring ticket:', ticket.id, 'to', recipientAddress);
       const result = await transferTicket(lucid, {
@@ -191,6 +202,9 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
       loadData();
     } catch (err) {
       console.error(err);
+      setError(err instanceof Error ? err.message : 'Failed to transfer ticket');
+    } finally {
+      setActionInProgress(null);
     }
   };
 
@@ -281,6 +295,33 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
         <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 mb-8">
           Order Summary
         </h3>
+
+        {/* Error Display */}
+        {error && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl">
+            <div className="flex justify-between items-start">
+              <p className="text-sm text-red-700">{error}</p>
+              <button
+                onClick={() => setError(null)}
+                className="text-red-400 hover:text-red-600 ml-2"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Action in Progress */}
+        {actionInProgress && (
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+            <p className="text-sm text-blue-700 flex items-center gap-2">
+              <span className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+              {actionInProgress === 'listing' && 'Listing ticket...'}
+              {actionInProgress === 'canceling' && 'Canceling listing...'}
+              {actionInProgress === 'transferring' && 'Transferring ticket...'}
+            </p>
+          </div>
+        )}
 
         {!selectedTicket ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center border-4 border-dashed border-slate-200 rounded-[32px] p-10 bg-white/50">

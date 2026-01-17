@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Lucid } from '@lucid-evolution/lucid';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabase';
 import { initializePlatformSettings } from '../services/ticketService';
 
 // Get the return type of Lucid function (the actual instance type)
@@ -17,12 +17,6 @@ interface UseGenesisReturn extends GenesisState {
   initializePlatform: (lucidInstance: LucidInstance, walletAddress: string) => Promise<void>;
   resetGenesis: () => void;
 }
-
-// Initialize Supabase client
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_API_KEY
-);
 
 export const useGenesis = (): UseGenesisReturn => {
   const [state, setState] = useState<GenesisState>({

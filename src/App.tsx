@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useLucid } from "./hooks/useLucid";
 import { useGenesis } from "./hooks/useGenesis";
-import { CreateEvent } from "./components/CreateEvent";
 import { TicketMarketplace } from "./components/TicketMarketplace";
+import { EventsPage } from "./components/EventsPage";
+import { OrganizerDashboard } from "./components/OrganizerDashboard";
 import { Layout } from "./components/layout";
+import { BRAND, isAuthorizedOrganizer } from "./constants";
 
-type AppTab = 'setup' | 'create-event' | 'marketplace';
+type AppTab = 'setup' | 'events' | 'my-tickets' | 'organizer';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<AppTab>('setup');
@@ -36,6 +38,7 @@ export default function App() {
   };
 
   const isPlatformReady = isConnected && isInitialized && lucid && address;
+  const isOrganizer = isAuthorizedOrganizer(address ?? undefined);
 
   return (
     <Layout
@@ -45,6 +48,7 @@ export default function App() {
       activeTab={activeTab}
       onTabChange={(tab) => setActiveTab(tab as AppTab)}
       isPlatformReady={!!isPlatformReady}
+      isOrganizer={isOrganizer}
     >
       {/* Setup Tab */}
       {activeTab === 'setup' && (
@@ -125,7 +129,7 @@ export default function App() {
               ) : !isInitialized ? (
                 <>
                   <p className="text-slate-600 mb-4">
-                    Create the genesis transaction to initialize the Seatmint platform on Preview testnet.
+                    Create the genesis transaction to initialize the {BRAND.name} platform on Preview testnet.
                   </p>
                   <button
                     onClick={handleInitialize}
@@ -156,7 +160,7 @@ export default function App() {
               <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 text-white text-center">
                 <p className="font-bold text-lg mb-1">You're all set!</p>
                 <p className="text-blue-100 text-sm">
-                  Use the navigation above to create events or browse the marketplace.
+                  Browse "Events" for new tickets, check "Resale" for deals, or manage yours in "My Tickets".
                 </p>
               </div>
             )}
@@ -164,14 +168,19 @@ export default function App() {
         </div>
       )}
 
-      {/* Create Event Tab */}
-      {activeTab === 'create-event' && isPlatformReady && (
-        <CreateEvent lucid={lucid} walletAddress={address} />
+      {/* Events Tab (Primary + Resale Markets) */}
+      {activeTab === 'events' && isPlatformReady && (
+        <EventsPage lucid={lucid} userAddress={address!} />
       )}
 
-      {/* Marketplace Tab */}
-      {activeTab === 'marketplace' && isPlatformReady && (
-        <TicketMarketplace lucid={lucid} userAddress={address} />
+      {/* My Tickets Tab */}
+      {activeTab === 'my-tickets' && isPlatformReady && (
+        <TicketMarketplace lucid={lucid} userAddress={address!} />
+      )}
+
+      {/* Organizer Dashboard */}
+      {activeTab === 'organizer' && isPlatformReady && isOrganizer && (
+        <OrganizerDashboard lucid={lucid} userAddress={address!} />
       )}
     </Layout>
   );

@@ -11,60 +11,7 @@ use cardano/transaction.{
   InlineDatum, Input, Output, OutputReference, Transaction, ValidityRange,
   placeholder,
 }
-
-// ============================================
-// TYPE DEFINITIONS
-// ============================================
-
-/// Global platform settings
-pub type GlobalSettings {
-  is_market_active: Bool,
-  current_max_supply: Int,
-  platform_fee_bps: Int,
-}
-
-/// Time window for sales (presale, limited availability)
-pub type TimeWindow {
-  start_time: Int,
-  end_time: Int,
-}
-
-/// Anti-scalping rules to prevent bulk buying
-pub type AntiScalpingRules {
-  max_per_transaction: Int,
-  max_per_wallet: Int,
-  cooldown_period: Int,
-}
-
-/// Whitelist for presales
-pub type Whitelist {
-  approved_addresses: List<VerificationKeyHash>,
-}
-
-/// Pricing strategies (extensible design)
-pub type PricingStrategy {
-  FixedPrice { price: Int }
-  // Future: TimeBased, DemandBased, etc.
-}
-
-/// Sale configuration stored in UTXO datum
-pub type SaleDatum {
-  organizer_address: Address,
-  base_price: Int,
-  event_policy: PolicyId,
-  // Optional features (None = feature disabled)
-  sale_window: Option<TimeWindow>,
-  anti_scalping_rules: Option<AntiScalpingRules>,
-  whitelist: Option<Whitelist>,
-  pricing_strategy: PricingStrategy,
-}
-
-/// Purchase action
-pub type SaleRedeemer {
-  quantity: Int,
-  payment_amount: Int,
-  buyer_pkh: VerificationKeyHash,
-}
+use types.{GlobalSettings, SaleDatum, SaleRedeemer, TimeWindow, AntiScalpingRules, Whitelist, PricingStrategy, PricingStrategy.FixedPrice}
 
 /// Primary Sale Validator (Box Office) - Extensible Design
 /// 

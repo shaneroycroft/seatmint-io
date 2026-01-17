@@ -1,12 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createEvent, EventCreationParams, TicketTier } from '../services/ticketService';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../lib/supabase';
 import { TicketPreview } from './TicketPreview';
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_API_KEY
-);
 
 interface CreateEventProps {
   lucid: any;

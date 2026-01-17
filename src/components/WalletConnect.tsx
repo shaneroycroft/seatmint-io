@@ -1,6 +1,7 @@
 import React from 'react';
 import { useLucid, WalletName } from '../hooks/useLucid';
 import { useGenesis } from '../hooks/useGenesis';
+import { BRAND } from '../constants';
 
 const WALLET_ICONS: Record<WalletName, string> = {
   nami: '🦎',
@@ -58,7 +59,7 @@ export const WalletConnect: React.FC = () => {
           <div className="text-center p-6 bg-yellow-50 rounded-lg">
             <p className="text-yellow-800 mb-2">No Cardano wallets detected</p>
             <p className="text-sm text-yellow-600">
-              Please install a Cardano wallet extension to use Seatmint
+              Please install a Cardano wallet extension to use {BRAND.name}
             </p>
           </div>
         ) : (
@@ -109,7 +110,7 @@ export const WalletConnect: React.FC = () => {
         <div className="border-t pt-6">
           <h3 className="text-xl font-bold mb-4">Platform Initialization</h3>
           <p className="text-gray-600 mb-4">
-            Initialize the Seatmint platform to start creating and managing tickets.
+            Initialize the {BRAND.name} platform to start creating and managing tickets.
           </p>
           <button
             onClick={handleGenesisInit}
