@@ -4,10 +4,12 @@ import { useGenesis } from "./hooks/useGenesis";
 import { TicketMarketplace } from "./components/TicketMarketplace";
 import { EventsPage } from "./components/EventsPage";
 import { OrganizerDashboard } from "./components/OrganizerDashboard";
+import { PlatformSettings } from "./components/PlatformSettings";
 import { Layout } from "./components/layout";
+import { ToastProvider } from "./contexts/ToastContext";
 import { BRAND, isAuthorizedOrganizer } from "./constants";
 
-type AppTab = 'setup' | 'events' | 'my-tickets' | 'organizer';
+type AppTab = 'setup' | 'events' | 'my-tickets' | 'organizer' | 'settings';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<AppTab>('setup');
@@ -41,6 +43,7 @@ export default function App() {
   const isOrganizer = isAuthorizedOrganizer(address ?? undefined);
 
   return (
+    <ToastProvider>
     <Layout
       isConnected={isConnected}
       address={address ?? undefined}
@@ -182,6 +185,12 @@ export default function App() {
       {activeTab === 'organizer' && isPlatformReady && isOrganizer && (
         <OrganizerDashboard lucid={lucid} userAddress={address!} />
       )}
+
+      {/* Platform Settings (Admin) */}
+      {activeTab === 'settings' && isPlatformReady && isOrganizer && (
+        <PlatformSettings lucid={lucid} adminAddress={address!} />
+      )}
     </Layout>
+    </ToastProvider>
   );
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { resetPlatformSettings, initializePlatformSettings, isSettingsInitialized } from '../services/ticketService';
 
 interface PlatformSettingsProps {
   lucid: any;
@@ -14,15 +15,67 @@ interface Settings {
   isMarketActive: boolean;
 }
 
-export const PlatformSettings: React.FC<PlatformSettingsProps> = ({ lucid: _lucid, adminAddress: _adminAddress }) => {
+export const PlatformSettings: React.FC<PlatformSettingsProps> = ({ lucid, adminAddress: _adminAddress }) => {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [onChainInitialized, setOnChainInitialized] = useState<boolean | null>(null);
+  const [reinitializing, setReinitializing] = useState(false);
 
   useEffect(() => {
     loadSettings();
+    checkOnChainSettings();
   }, []);
+
+  const checkOnChainSettings = async () => {
+    try {
+      const initialized = await isSettingsInitialized();
+      setOnChainInitialized(initialized);
+    } catch (err) {
+      console.error('Failed to check on-chain settings:', err);
+    }
+  };
+
+  const handleResetAndReinitialize = async () => {
+    if (!lucid) {
+      setError('Wallet not connected. Please connect your wallet first.');
+      return;
+    }
+
+    if (!confirm('This will create NEW on-chain settings. The old settings NFT will be abandoned. Continue?')) {
+      return;
+    }
+
+    setReinitializing(true);
+    setError(null);
+
+    try {
+      // Step 1: Reset database reference
+      await resetPlatformSettings();
+      console.log('Database reference cleared');
+
+      // Step 2: Re-initialize on-chain
+      const result = await initializePlatformSettings(lucid, {
+        platformFeeBps: 250,      // 2.5%
+        isMarketActive: true,
+        currentMaxSupply: 10000,
+        maxResaleMultiplier: 300  // 3x
+      });
+
+      console.log('New settings created:', result);
+      alert(`Success! New Settings Policy ID: ${result.settingsPolicyId}`);
+
+      // Refresh state
+      await loadSettings();
+      await checkOnChainSettings();
+    } catch (err) {
+      console.error('Re-initialization failed:', err);
+      setError(err instanceof Error ? err.message : 'Failed to re-initialize settings');
+    } finally {
+      setReinitializing(false);
+    }
+  };
 
   const loadSettings = async () => {
     try {
@@ -292,6 +345,46 @@ export const PlatformSettings: React.FC<PlatformSettingsProps> = ({ lucid: _luci
               {settings.platformTreasury}
             </p>
           </div>
+        </div>
+
+        {/* On-Chain Settings Card */}
+        <div className="bg-white rounded-2xl shadow-lg border border-orange-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">On-Chain Settings (Advanced)</h3>
+              <p className="text-sm text-slate-500">Manage the on-chain GlobalSettings NFT</p>
+            </div>
+            <div className={`px-3 py-1 rounded-full text-xs font-bold ${
+              onChainInitialized === null
+                ? 'bg-slate-100 text-slate-500'
+                : onChainInitialized
+                  ? 'bg-green-100 text-green-700'
+                  : 'bg-red-100 text-red-700'
+            }`}>
+              {onChainInitialized === null ? 'Checking...' : onChainInitialized ? 'Initialized' : 'Not Initialized'}
+            </div>
+          </div>
+
+          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-4">
+            <p className="text-orange-800 text-sm">
+              <strong>Warning:</strong> Use this if the on-chain settings datum format is outdated
+              (e.g., after validator schema changes). This will create a NEW settings NFT on-chain.
+            </p>
+          </div>
+
+          <button
+            onClick={handleResetAndReinitialize}
+            disabled={reinitializing || !lucid}
+            className="w-full py-4 rounded-xl font-bold text-white bg-orange-500 hover:bg-orange-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {reinitializing ? 'Re-initializing... (Check wallet for signature)' : 'Reset & Re-initialize On-Chain Settings'}
+          </button>
+
+          {!lucid && (
+            <p className="text-center text-sm text-slate-500 mt-2">
+              Connect your wallet to use this feature
+            </p>
+          )}
         </div>
       </div>
     </div>

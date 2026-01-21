@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { purchaseTickets, purchaseFromStorefront } from '../services/ticketService';
+import { useToast, TOAST_MESSAGES } from '../contexts/ToastContext';
 
 // Types for Official Sales
 interface TicketTier {
@@ -89,6 +90,7 @@ const getTierColor = (tierName: string): string => {
 export const EventsPage: React.FC<EventsPageProps> = ({ lucid, userAddress }) => {
   const [activeTab, setActiveTab] = useState<MarketTab>('official');
   const [searchQuery, setSearchQuery] = useState('');
+  const toast = useToast();
 
   // Official market state
   const [events, setEvents] = useState<Event[]>([]);
@@ -104,8 +106,7 @@ export const EventsPage: React.FC<EventsPageProps> = ({ lucid, userAddress }) =>
 
   // Shared state
   const [isPurchasing, setIsPurchasing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
 
   const platformFeePercent = 2;
 
@@ -131,7 +132,7 @@ export const EventsPage: React.FC<EventsPageProps> = ({ lucid, userAddress }) =>
       setEvents(data || []);
     } catch (err) {
       console.error('Failed to load events:', err);
-      setError('Failed to load events');
+      toast.error('Unable to Load Events', 'Please check your connection and try again.');
     } finally {
       setLoadingEvents(false);
     }
@@ -171,7 +172,7 @@ export const EventsPage: React.FC<EventsPageProps> = ({ lucid, userAddress }) =>
       setListings(formattedListings);
     } catch (err) {
       console.error('Failed to load listings:', err);
-      setError('Failed to load resale listings');
+      toast.error('Unable to Load Listings', 'Please check your connection and try again.');
     } finally {
       setLoadingListings(false);
     }
@@ -181,25 +182,40 @@ export const EventsPage: React.FC<EventsPageProps> = ({ lucid, userAddress }) =>
   const handleOfficialPurchase = async () => {
     if (!selectedEvent || !selectedTier) return;
 
-    setError(null);
-    setSuccess(null);
     setIsPurchasing(true);
+    const pendingToastId = toast.pending(
+      TOAST_MESSAGES.purchaseStarted.title,
+      TOAST_MESSAGES.purchaseStarted.message
+    );
 
     try {
-      const result = await purchaseTickets(lucid, {
+      await purchaseTickets(lucid, {
         eventId: selectedEvent.id,
         tierId: selectedTier.id,
         quantity,
       });
 
-      setSuccess(`Successfully purchased ${quantity} ticket(s)! TX: ${result.txHash.slice(0, 16)}...`);
+      toast.dismissToast(pendingToastId);
+      toast.success(
+        TOAST_MESSAGES.purchaseSuccess.title,
+        `${quantity} ticket${quantity > 1 ? 's' : ''} for ${selectedEvent.event_name} secured! Your ticket${quantity > 1 ? 's' : ''} will appear in My Tickets shortly.`
+      );
       setSelectedEvent(null);
       setSelectedTier(null);
       setQuantity(1);
+      setIsPanelOpen(false);
       loadEvents();
     } catch (err) {
       console.error('Purchase failed:', err);
-      setError(err instanceof Error ? err.message : 'Failed to purchase tickets');
+      toast.dismissToast(pendingToastId);
+      const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
+      // Make error messages user-friendly
+      const friendlyMessage = errorMessage.includes('user rejected') || errorMessage.includes('cancelled')
+        ? 'You cancelled the transaction. No worries - you can try again when ready.'
+        : errorMessage.includes('insufficient')
+        ? 'Your wallet doesn\'t have enough ADA for this purchase.'
+        : 'We couldn\'t complete your purchase. Please try again.';
+      toast.error(TOAST_MESSAGES.purchaseFailed.title, friendlyMessage);
     } finally {
       setIsPurchasing(false);
     }
@@ -208,22 +224,36 @@ export const EventsPage: React.FC<EventsPageProps> = ({ lucid, userAddress }) =>
   const handleResalePurchase = async () => {
     if (!selectedListing || !selectedListing.listing_utxo_ref) return;
 
-    setError(null);
-    setSuccess(null);
     setIsPurchasing(true);
+    const pendingToastId = toast.pending(
+      TOAST_MESSAGES.purchaseStarted.title,
+      TOAST_MESSAGES.purchaseStarted.message
+    );
 
     try {
-      const result = await purchaseFromStorefront(lucid, {
+      await purchaseFromStorefront(lucid, {
         listingUtxoRef: selectedListing.listing_utxo_ref,
         eventId: selectedListing.event_id,
       });
 
-      setSuccess(`Ticket purchased! TX: ${result.txHash.slice(0, 16)}...`);
+      toast.dismissToast(pendingToastId);
+      toast.success(
+        TOAST_MESSAGES.purchaseSuccess.title,
+        `Your ticket for ${selectedListing.event_name} is on its way! Check My Tickets shortly.`
+      );
       setSelectedListing(null);
+      setIsPanelOpen(false);
       loadListings();
     } catch (err) {
       console.error('Purchase failed:', err);
-      setError(err instanceof Error ? err.message : 'Failed to purchase ticket');
+      toast.dismissToast(pendingToastId);
+      const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
+      const friendlyMessage = errorMessage.includes('user rejected') || errorMessage.includes('cancelled')
+        ? 'You cancelled the transaction. No worries - you can try again when ready.'
+        : errorMessage.includes('insufficient')
+        ? 'Your wallet doesn\'t have enough ADA for this purchase.'
+        : 'We couldn\'t complete your purchase. Please try again.';
+      toast.error(TOAST_MESSAGES.purchaseFailed.title, friendlyMessage);
     } finally {
       setIsPurchasing(false);
     }
@@ -265,9 +295,15 @@ export const EventsPage: React.FC<EventsPageProps> = ({ lucid, userAddress }) =>
     setSelectedEvent(null);
     setSelectedTier(null);
     setSelectedListing(null);
-    setError(null);
-    setSuccess(null);
     setSearchQuery('');
+    setIsPanelOpen(false);
+  };
+
+  const closePanel = () => {
+    setIsPanelOpen(false);
+    setSelectedEvent(null);
+    setSelectedTier(null);
+    setSelectedListing(null);
   };
 
   const isLoading = activeTab === 'official' ? loadingEvents : loadingListings;
@@ -343,28 +379,6 @@ export const EventsPage: React.FC<EventsPageProps> = ({ lucid, userAddress }) =>
         </div>
       </div>
 
-      {/* Messages */}
-      {(error || success) && (
-        <div className="px-6 pt-4">
-          {error && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-xl mb-2">
-              <div className="flex justify-between items-start">
-                <p className="text-sm text-red-700">{error}</p>
-                <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600 ml-2">×</button>
-              </div>
-            </div>
-          )}
-          {success && (
-            <div className="p-4 bg-green-50 border border-green-200 rounded-xl">
-              <div className="flex justify-between items-start">
-                <p className="text-sm text-green-700">{success}</p>
-                <button onClick={() => setSuccess(null)} className="text-green-400 hover:text-green-600 ml-2">×</button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Main Content Area */}
       <div className="flex-1 flex overflow-hidden">
         {/* Content Grid */}
@@ -397,8 +411,7 @@ export const EventsPage: React.FC<EventsPageProps> = ({ lucid, userAddress }) =>
                       setSelectedEvent(event);
                       setSelectedTier(event.ticket_tiers[0] || null);
                       setQuantity(1);
-                      setError(null);
-                      setSuccess(null);
+                      setIsPanelOpen(true);
                     }}
                   />
                 ))}
@@ -426,8 +439,7 @@ export const EventsPage: React.FC<EventsPageProps> = ({ lucid, userAddress }) =>
                     isSelected={selectedListing?.id === listing.id}
                     onClick={() => {
                       setSelectedListing(listing);
-                      setError(null);
-                      setSuccess(null);
+                      setIsPanelOpen(true);
                     }}
                   />
                 ))}
@@ -436,111 +448,215 @@ export const EventsPage: React.FC<EventsPageProps> = ({ lucid, userAddress }) =>
           )}
         </div>
 
-        {/* Purchase Panel - Only shows when something is selected */}
-        {hasSelection && (
-          <aside className="w-[380px] bg-slate-50 p-6 flex flex-col shrink-0 border-l border-slate-200 overflow-y-auto">
-            {activeTab === 'official' && selectedEvent ? (
-              // Official Purchase Panel
-              <div className="flex flex-col h-full">
-                <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">
-                    Purchase Details
-                  </h3>
-                  <button
-                    onClick={() => { setSelectedEvent(null); setSelectedTier(null); }}
-                    className="text-slate-400 hover:text-slate-600 text-xl leading-none"
-                  >
-                    ×
-                  </button>
-                </div>
+      </div>
 
-                {/* Event Summary */}
-                <div className="bg-white p-5 rounded-2xl shadow-lg mb-4">
-                  <h4 className="font-black text-lg text-slate-900 mb-1">{selectedEvent.event_name}</h4>
-                  <p className="text-slate-500 text-sm">{selectedEvent.venue_name}</p>
-                  <p className="text-slate-400 text-xs">{formatDate(selectedEvent.event_date)}</p>
-                </div>
+      {/* Flyout Order Summary Panel */}
+      {hasSelection && (
+        <>
+          {/* Backdrop */}
+          <div
+            className={`fixed inset-0 bg-black/30 z-40 transition-opacity ${
+              isPanelOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+            }`}
+            onClick={closePanel}
+          />
 
-                {/* Tier Selection */}
-                <div className="mb-4">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2 block">
-                    Select Tier
-                  </label>
-                  <div className="space-y-2">
-                    {selectedEvent.ticket_tiers.map((tier) => (
-                      <button
-                        key={tier.id}
-                        onClick={() => { setSelectedTier(tier); setQuantity(1); }}
-                        disabled={tier.remaining_supply === 0}
-                        className={`w-full p-3 rounded-xl text-left transition-all text-sm ${
-                          selectedTier?.id === tier.id
-                            ? 'bg-blue-600 text-white shadow-lg'
-                            : tier.remaining_supply === 0
-                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                            : 'bg-white hover:bg-slate-50 text-slate-900 border border-slate-200'
-                        }`}
-                      >
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <p className="font-bold">{tier.tier_name}</p>
-                            <p className={`text-xs ${selectedTier?.id === tier.id ? 'text-blue-200' : 'text-slate-400'}`}>
-                              {tier.remaining_supply} left
-                            </p>
-                          </div>
-                          <p className="font-black">₳{formatPrice(tier.price_lovelace)}</p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Quantity */}
-                {selectedTier && selectedTier.remaining_supply > 0 && (
-                  <div className="mb-4">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2 block">
-                      Quantity
-                    </label>
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                        className="w-10 h-10 bg-slate-200 hover:bg-slate-300 rounded-lg font-bold text-lg"
-                      >
-                        -
-                      </button>
-                      <span className="text-xl font-black w-8 text-center">{quantity}</span>
-                      <button
-                        onClick={() => setQuantity(Math.min(selectedTier.max_per_wallet, selectedTier.remaining_supply, quantity + 1))}
-                        className="w-10 h-10 bg-slate-200 hover:bg-slate-300 rounded-lg font-bold text-lg"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Total */}
-                {selectedTier && (
-                  <div className="bg-white p-4 rounded-2xl shadow-lg mb-4">
-                    <div className="flex justify-between items-center text-sm mb-2">
-                      <span className="text-slate-500">Unit price</span>
-                      <span className="font-mono">₳{formatPrice(selectedTier.price_lovelace)}</span>
-                    </div>
-                    <div className="pt-3 border-t border-slate-100 flex justify-between items-end">
-                      <span className="text-xs font-black uppercase text-slate-400">Total</span>
-                      <span className="text-2xl font-black text-slate-900">
-                        ₳{formatPrice(selectedTier.price_lovelace * quantity)}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Purchase Button */}
-                <div className="mt-auto">
-                  {selectedTier && selectedTier.remaining_supply > 0 && (
+          {/* Slide-in Panel */}
+          <aside
+            className={`fixed top-0 right-0 h-full w-[400px] max-w-[90vw] bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-out ${
+              isPanelOpen ? 'translate-x-0' : 'translate-x-full'
+            }`}
+          >
+            <div className="h-full flex flex-col">
+              {activeTab === 'official' && selectedEvent ? (
+                // Official Purchase Panel
+                <div className="flex flex-col h-full">
+                  {/* Header */}
+                  <div className="flex justify-between items-center p-6 border-b border-slate-200">
+                    <h3 className="text-sm font-black uppercase tracking-[0.15em] text-slate-900">
+                      Purchase Details
+                    </h3>
                     <button
-                      onClick={handleOfficialPurchase}
+                      onClick={closePanel}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                    {/* Event Summary */}
+                    <div className="bg-slate-50 p-5 rounded-2xl">
+                      <h4 className="font-black text-lg text-slate-900 mb-1">{selectedEvent.event_name}</h4>
+                      <p className="text-slate-500 text-sm">{selectedEvent.venue_name}</p>
+                      <p className="text-slate-400 text-xs">{formatDate(selectedEvent.event_date)}</p>
+                    </div>
+
+                    {/* Tier Selection */}
+                    <div>
+                      <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2 block">
+                        Select Tier
+                      </label>
+                      <div className="space-y-2">
+                        {selectedEvent.ticket_tiers.map((tier) => (
+                          <button
+                            key={tier.id}
+                            onClick={() => { setSelectedTier(tier); setQuantity(1); }}
+                            disabled={tier.remaining_supply === 0}
+                            className={`w-full p-3 rounded-xl text-left transition-all text-sm ${
+                              selectedTier?.id === tier.id
+                                ? 'bg-blue-600 text-white shadow-lg'
+                                : tier.remaining_supply === 0
+                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                : 'bg-white hover:bg-slate-50 text-slate-900 border border-slate-200'
+                            }`}
+                          >
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <p className="font-bold">{tier.tier_name}</p>
+                                <p className={`text-xs ${selectedTier?.id === tier.id ? 'text-blue-200' : 'text-slate-400'}`}>
+                                  {tier.remaining_supply} left
+                                </p>
+                              </div>
+                              <p className="font-black">₳{formatPrice(tier.price_lovelace)}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Quantity */}
+                    {selectedTier && selectedTier.remaining_supply > 0 && (
+                      <div>
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2 block">
+                          Quantity
+                        </label>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                            className="w-10 h-10 bg-slate-200 hover:bg-slate-300 rounded-lg font-bold text-lg"
+                          >
+                            -
+                          </button>
+                          <span className="text-xl font-black w-8 text-center">{quantity}</span>
+                          <button
+                            onClick={() => setQuantity(Math.min(selectedTier.max_per_wallet, selectedTier.remaining_supply, quantity + 1))}
+                            className="w-10 h-10 bg-slate-200 hover:bg-slate-300 rounded-lg font-bold text-lg"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Total */}
+                    {selectedTier && (
+                      <div className="bg-slate-50 p-4 rounded-2xl">
+                        <div className="flex justify-between items-center text-sm mb-2">
+                          <span className="text-slate-500">Unit price</span>
+                          <span className="font-mono">₳{formatPrice(selectedTier.price_lovelace)}</span>
+                        </div>
+                        <div className="pt-3 border-t border-slate-200 flex justify-between items-end">
+                          <span className="text-xs font-black uppercase text-slate-400">Total</span>
+                          <span className="text-2xl font-black text-slate-900">
+                            ₳{formatPrice(selectedTier.price_lovelace * quantity)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Footer with Purchase Button */}
+                  <div className="p-6 border-t border-slate-200 bg-white">
+                    {selectedTier && selectedTier.remaining_supply > 0 && (
+                      <button
+                        onClick={handleOfficialPurchase}
+                        disabled={isPurchasing}
+                        className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black shadow-xl hover:bg-blue-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {isPurchasing ? (
+                          <>
+                            <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            Processing...
+                          </>
+                        ) : (
+                          `Buy ${quantity} Ticket${quantity > 1 ? 's' : ''}`
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : activeTab === 'resale' && selectedListing ? (
+                // Resale Purchase Panel
+                <div className="flex flex-col h-full">
+                  {/* Header */}
+                  <div className="flex justify-between items-center p-6 border-b border-slate-200">
+                    <h3 className="text-sm font-black uppercase tracking-[0.15em] text-slate-900">
+                      Order Summary
+                    </h3>
+                    <button
+                      onClick={closePanel}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                    {/* Listing Details */}
+                    <div className="bg-slate-50 p-5 rounded-2xl relative overflow-hidden">
+                      <div className={`absolute top-0 left-0 w-1.5 h-full ${getTierColor(selectedListing.tier_name)}`} />
+                      <h4 className="font-black text-lg text-slate-900 mb-1 pl-2">{selectedListing.event_name}</h4>
+                      <p className="text-slate-500 text-sm pl-2">{selectedListing.venue}</p>
+                      <p className="text-slate-400 text-xs pl-2">{new Date(selectedListing.event_date).toLocaleDateString()}</p>
+                      <p className="text-slate-600 text-sm font-semibold pl-2 mt-2">{selectedListing.tier_name}</p>
+                    </div>
+
+                    {/* Price Breakdown */}
+                    {purchaseBreakdown && (
+                      <div className="bg-slate-50 p-4 rounded-2xl">
+                        <div className="flex justify-between text-sm mb-2">
+                          <span className="text-slate-400">Original price</span>
+                          <span className="line-through text-slate-400">₳{selectedListing.original_price}</span>
+                        </div>
+                        <div className="flex justify-between text-sm mb-2">
+                          <span className="text-slate-500">Resale price</span>
+                          <span className="font-mono">₳{purchaseBreakdown.subtotal}</span>
+                        </div>
+                        <div className="flex justify-between text-sm mb-3">
+                          <span className="text-slate-500">Platform fee ({platformFeePercent}%)</span>
+                          <span className="font-mono">₳{purchaseBreakdown.fee.toFixed(2)}</span>
+                        </div>
+                        <div className="pt-3 border-t-2 border-dashed border-slate-200 flex justify-between items-end">
+                          <span className="text-xs font-black uppercase text-slate-400">Total</span>
+                          <span className="text-2xl font-black text-slate-900">
+                            ₳{purchaseBreakdown.total.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Seller Info */}
+                    <div className="bg-slate-50 p-3 rounded-xl">
+                      <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5">Seller</p>
+                      <p className="text-xs font-mono text-slate-600 truncate">
+                        {selectedListing.seller_address.slice(0, 16)}...{selectedListing.seller_address.slice(-6)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Footer with Purchase Button */}
+                  <div className="p-6 border-t border-slate-200 bg-white">
+                    <button
+                      onClick={handleResalePurchase}
                       disabled={isPurchasing}
-                      className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black shadow-xl hover:bg-blue-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                      className="w-full bg-orange-600 text-white py-4 rounded-2xl font-black shadow-xl hover:bg-orange-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                     >
                       {isPurchasing ? (
                         <>
@@ -548,90 +664,16 @@ export const EventsPage: React.FC<EventsPageProps> = ({ lucid, userAddress }) =>
                           Processing...
                         </>
                       ) : (
-                        `Buy ${quantity} Ticket${quantity > 1 ? 's' : ''}`
+                        'Buy from Resale'
                       )}
                     </button>
-                  )}
-                </div>
-              </div>
-            ) : activeTab === 'resale' && selectedListing ? (
-              // Resale Purchase Panel
-              <div className="flex flex-col h-full">
-                <div className="flex justify-between items-start mb-4">
-                  <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">
-                    Order Summary
-                  </h3>
-                  <button
-                    onClick={() => setSelectedListing(null)}
-                    className="text-slate-400 hover:text-slate-600 text-xl leading-none"
-                  >
-                    ×
-                  </button>
-                </div>
-
-                {/* Listing Details */}
-                <div className="bg-white p-5 rounded-2xl shadow-lg mb-4 relative overflow-hidden">
-                  <div className={`absolute top-0 left-0 w-1.5 h-full ${getTierColor(selectedListing.tier_name)}`} />
-                  <h4 className="font-black text-lg text-slate-900 mb-1 pl-2">{selectedListing.event_name}</h4>
-                  <p className="text-slate-500 text-sm pl-2">{selectedListing.venue}</p>
-                  <p className="text-slate-400 text-xs pl-2">{new Date(selectedListing.event_date).toLocaleDateString()}</p>
-                  <p className="text-slate-600 text-sm font-semibold pl-2 mt-2">{selectedListing.tier_name}</p>
-                </div>
-
-                {/* Price Breakdown */}
-                {purchaseBreakdown && (
-                  <div className="bg-white p-4 rounded-2xl shadow-lg mb-4">
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-slate-400">Original price</span>
-                      <span className="line-through text-slate-400">₳{selectedListing.original_price}</span>
-                    </div>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-slate-500">Resale price</span>
-                      <span className="font-mono">₳{purchaseBreakdown.subtotal}</span>
-                    </div>
-                    <div className="flex justify-between text-sm mb-3">
-                      <span className="text-slate-500">Platform fee ({platformFeePercent}%)</span>
-                      <span className="font-mono">₳{purchaseBreakdown.fee.toFixed(2)}</span>
-                    </div>
-                    <div className="pt-3 border-t-2 border-dashed border-slate-100 flex justify-between items-end">
-                      <span className="text-xs font-black uppercase text-slate-400">Total</span>
-                      <span className="text-2xl font-black text-slate-900">
-                        ₳{purchaseBreakdown.total.toFixed(2)}
-                      </span>
-                    </div>
                   </div>
-                )}
-
-                {/* Seller Info */}
-                <div className="bg-white p-3 rounded-xl mb-4">
-                  <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-0.5">Seller</p>
-                  <p className="text-xs font-mono text-slate-600 truncate">
-                    {selectedListing.seller_address.slice(0, 16)}...{selectedListing.seller_address.slice(-6)}
-                  </p>
                 </div>
-
-                {/* Purchase Button */}
-                <div className="mt-auto">
-                  <button
-                    onClick={handleResalePurchase}
-                    disabled={isPurchasing}
-                    className="w-full bg-orange-600 text-white py-4 rounded-2xl font-black shadow-xl hover:bg-orange-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {isPurchasing ? (
-                      <>
-                        <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      'Buy from Resale'
-                    )}
-                  </button>
-                </div>
-              </div>
-            ) : null}
+              ) : null}
+            </div>
           </aside>
-        )}
-      </div>
+        </>
+      )}
     </div>
   );
 };

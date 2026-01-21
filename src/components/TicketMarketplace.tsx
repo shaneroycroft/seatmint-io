@@ -6,6 +6,7 @@ import {
   cancelStorefrontListing,
   transferTicket,
 } from '../services/ticketService';
+import { useToast, TOAST_MESSAGES } from '../contexts/ToastContext';
 
 interface Ticket {
   id: string;
@@ -54,8 +55,8 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
   const [loading, setLoading] = useState(true);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [isPurchasing, setIsPurchasing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [actionInProgress, setActionInProgress] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const toast = useToast();
 
   const platformFeePercent = 2;
 
@@ -124,87 +125,143 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
     }));
   };
 
+  // Helper to create user-friendly error messages
+  const getFriendlyErrorMessage = (err: unknown, defaultMsg: string): string => {
+    const errorMessage = err instanceof Error ? err.message : 'Something went wrong';
+    if (errorMessage.includes('user rejected') || errorMessage.includes('cancelled')) {
+      return 'You cancelled the transaction. No worries - you can try again when ready.';
+    }
+    if (errorMessage.includes('insufficient')) {
+      return 'Your wallet doesn\'t have enough ADA for this transaction.';
+    }
+    return defaultMsg;
+  };
+
   const handleListTicketForSale = async (ticket: Ticket, priceAda: number) => {
-    setError(null);
-    setActionInProgress('listing');
+    setIsProcessing(true);
+    const pendingToastId = toast.pending(
+      TOAST_MESSAGES.listingStarted.title,
+      TOAST_MESSAGES.listingStarted.message
+    );
+
     try {
-      console.log('Listing ticket:', ticket.id, 'for', priceAda, 'ADA');
-      const result = await listTicketForResale(lucid, {
+      await listTicketForResale(lucid, {
         ticketAssetName: ticket.nft_asset_name,
         priceAda,
         eventId: ticket.event_id,
       });
-      console.log('Listed successfully:', result);
+      toast.dismissToast(pendingToastId);
+      toast.success(
+        TOAST_MESSAGES.listingSuccess.title,
+        `Your ticket for ${ticket.event_name} is now listed at ₳${priceAda}.`
+      );
       loadData();
     } catch (err) {
       console.error(err);
-      setError(err instanceof Error ? err.message : 'Failed to list ticket');
+      toast.dismissToast(pendingToastId);
+      toast.error(
+        TOAST_MESSAGES.listingFailed.title,
+        getFriendlyErrorMessage(err, 'We couldn\'t list your ticket. Please try again.')
+      );
     } finally {
-      setActionInProgress(null);
+      setIsProcessing(false);
     }
   };
 
   const handleCancelListing = async (ticket: Ticket) => {
-    setError(null);
-    setActionInProgress('canceling');
+    setIsProcessing(true);
+    const pendingToastId = toast.pending(
+      'Removing Listing',
+      'Please confirm in your wallet...'
+    );
+
     try {
       if (!ticket.listing_utxo_ref) {
-        throw new Error('No listing UTxO reference found');
+        throw new Error('No listing reference found');
       }
-      console.log('Canceling listing:', ticket.id);
-      const result = await cancelStorefrontListing(lucid, {
+      await cancelStorefrontListing(lucid, {
         listingUtxoRef: ticket.listing_utxo_ref,
         ticketId: ticket.id,
       });
-      console.log('Canceled successfully:', result);
+      toast.dismissToast(pendingToastId);
+      toast.success(
+        'Listing Removed',
+        `Your ticket for ${ticket.event_name} has been removed from the marketplace.`
+      );
       loadData();
     } catch (err) {
       console.error(err);
-      setError(err instanceof Error ? err.message : 'Failed to cancel listing');
+      toast.dismissToast(pendingToastId);
+      toast.error(
+        'Couldn\'t Remove Listing',
+        getFriendlyErrorMessage(err, 'We couldn\'t remove your listing. Please try again.')
+      );
     } finally {
-      setActionInProgress(null);
+      setIsProcessing(false);
     }
   };
 
   const handlePurchaseTicket = async (ticket: Ticket) => {
     if (!ticket.resale_price || !ticket.listing_utxo_ref) return;
 
-    setError(null);
     setIsPurchasing(true);
+    const pendingToastId = toast.pending(
+      TOAST_MESSAGES.purchaseStarted.title,
+      TOAST_MESSAGES.purchaseStarted.message
+    );
+
     try {
-      console.log('Purchasing ticket:', ticket.id);
-      const result = await purchaseFromStorefront(lucid, {
+      await purchaseFromStorefront(lucid, {
         listingUtxoRef: ticket.listing_utxo_ref,
         eventId: ticket.event_id,
       });
-      console.log('Purchased successfully:', result);
+      toast.dismissToast(pendingToastId);
+      toast.success(
+        TOAST_MESSAGES.purchaseSuccess.title,
+        `Your ticket for ${ticket.event_name} is on its way! Check My Tickets shortly.`
+      );
       setSelectedTicket(null);
       loadData();
     } catch (err) {
       console.error(err);
-      setError(err instanceof Error ? err.message : 'Failed to purchase ticket');
+      toast.dismissToast(pendingToastId);
+      toast.error(
+        TOAST_MESSAGES.purchaseFailed.title,
+        getFriendlyErrorMessage(err, 'We couldn\'t complete your purchase. Please try again.')
+      );
     } finally {
       setIsPurchasing(false);
     }
   };
 
   const handleTransferTicket = async (ticket: Ticket, recipientAddress: string) => {
-    setError(null);
-    setActionInProgress('transferring');
+    setIsProcessing(true);
+    const pendingToastId = toast.pending(
+      TOAST_MESSAGES.transferStarted.title,
+      TOAST_MESSAGES.transferStarted.message
+    );
+
     try {
-      console.log('Transferring ticket:', ticket.id, 'to', recipientAddress);
-      const result = await transferTicket(lucid, {
+      await transferTicket(lucid, {
         ticketAssetName: ticket.nft_asset_name,
         recipientAddress,
         eventPolicyId: ticket.event_policy_id,
       });
-      console.log('Transferred successfully:', result);
+      toast.dismissToast(pendingToastId);
+      toast.success(
+        TOAST_MESSAGES.transferSuccess.title,
+        `Your ticket for ${ticket.event_name} has been sent! The recipient will see it in their wallet shortly.`
+      );
       loadData();
     } catch (err) {
       console.error(err);
-      setError(err instanceof Error ? err.message : 'Failed to transfer ticket');
+      toast.dismissToast(pendingToastId);
+      toast.error(
+        TOAST_MESSAGES.transferFailed.title,
+        getFriendlyErrorMessage(err, 'We couldn\'t transfer your ticket. Please check the address and try again.')
+      );
     } finally {
-      setActionInProgress(null);
+      setIsProcessing(false);
     }
   };
 
@@ -296,33 +353,6 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
           Order Summary
         </h3>
 
-        {/* Error Display */}
-        {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl">
-            <div className="flex justify-between items-start">
-              <p className="text-sm text-red-700">{error}</p>
-              <button
-                onClick={() => setError(null)}
-                className="text-red-400 hover:text-red-600 ml-2"
-              >
-                ×
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Action in Progress */}
-        {actionInProgress && (
-          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-            <p className="text-sm text-blue-700 flex items-center gap-2">
-              <span className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-              {actionInProgress === 'listing' && 'Listing ticket...'}
-              {actionInProgress === 'canceling' && 'Canceling listing...'}
-              {actionInProgress === 'transferring' && 'Transferring ticket...'}
-            </p>
-          </div>
-        )}
-
         {!selectedTicket ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center border-4 border-dashed border-slate-200 rounded-[32px] p-10 bg-white/50">
             <h4 className="text-lg font-bold text-slate-800 mb-2">Select a ticket</h4>
@@ -398,9 +428,10 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
                 {selectedTicket.is_listed ? (
                   <button
                     onClick={() => handleCancelListing(selectedTicket)}
-                    className="w-full bg-red-500 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-red-600 transition-all"
+                    disabled={isProcessing}
+                    className="w-full bg-red-500 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-red-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Cancel Listing
+                    {isProcessing ? 'Processing...' : 'Cancel Listing'}
                   </button>
                 ) : (
                   <>
@@ -409,18 +440,20 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
                         const price = prompt('List price (ADA):');
                         if (price) handleListTicketForSale(selectedTicket, parseFloat(price));
                       }}
-                      className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-blue-700 transition-all"
+                      disabled={isProcessing}
+                      className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      List for Sale
+                      {isProcessing ? 'Processing...' : 'List for Sale'}
                     </button>
                     <button
                       onClick={() => {
                         const recipient = prompt('Recipient address:');
                         if (recipient) handleTransferTicket(selectedTicket, recipient);
                       }}
-                      className="w-full bg-slate-200 text-slate-700 py-4 rounded-2xl font-bold hover:bg-slate-300 transition-all"
+                      disabled={isProcessing}
+                      className="w-full bg-slate-200 text-slate-700 py-4 rounded-2xl font-bold hover:bg-slate-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Transfer to Friend
+                      {isProcessing ? 'Processing...' : 'Transfer to Friend'}
                     </button>
                   </>
                 )}

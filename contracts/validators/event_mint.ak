@@ -8,18 +8,8 @@ use cardano/transaction.{
   InlineDatum, Input, Output, OutputReference, Transaction, TransactionId,
   placeholder,
 }
-
-/// Types module (normally in separate file)
-pub type MintAction {
-  Mint
-  Burn
-}
-
-pub type GlobalSettings {
-  is_market_active: Bool,
-  current_max_supply: Int,
-  platform_fee_bps: Int,
-}
+// Import shared types to ensure consistency across validators
+use types.{GlobalSettings, MintAction, Mint, Burn}
 
 /// Event Minting Policy
 /// 
@@ -149,11 +139,16 @@ fn mock_settings_input(
   is_active: Bool,
   max_supply: Int,
 ) -> Input {
+  let treasury_address = mock_address(#"1111111111111111111111111111111111111111111111111111111111")
+  let admin_pkh = #"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   let settings_datum =
     GlobalSettings {
+      platform_fee_bps: 250,
+      platform_treasury: treasury_address,
       is_market_active: is_active,
       current_max_supply: max_supply,
-      platform_fee_bps: 250,
+      max_resale_multiplier: 300,
+      admin_pkh: admin_pkh,
     }
 
   Input {

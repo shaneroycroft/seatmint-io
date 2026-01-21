@@ -26,7 +26,10 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'setup', label: 'Setup', alwaysEnabled: true },
     { id: 'events', label: 'Events', requiresReady: true },
     { id: 'my-tickets', label: 'My Tickets', requiresReady: true },
-    ...(isOrganizer ? [{ id: 'organizer', label: 'Organizer', requiresReady: true, isSecondary: true }] : []),
+    ...(isOrganizer ? [
+      { id: 'organizer', label: 'Organizer', requiresReady: true, isSecondary: true },
+      { id: 'settings', label: 'Settings', requiresReady: true, isSecondary: true },
+    ] : []),
   ];
 
   return (

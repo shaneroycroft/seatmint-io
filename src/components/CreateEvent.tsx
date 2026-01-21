@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createEvent, EventCreationParams, TicketTier } from '../services/ticketService';
 import { supabase } from '../lib/supabase';
 import { TicketPreview } from './TicketPreview';
+import { useToast, TOAST_MESSAGES } from '../contexts/ToastContext';
 
 interface CreateEventProps {
   lucid: any;
@@ -59,6 +60,7 @@ const getMinDateTime = () => {
 };
 
 export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: _walletAddress }) => {
+  const toast = useToast();
   const [formData, setFormData] = useState({
     eventName: '',
     eventDescription: '',
@@ -246,9 +248,19 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
       setCreatedPolicyId(result.policyId);
       console.log('Event created:', result);
       setSuccess(true);
+      toast.success(TOAST_MESSAGES.eventCreated.title, `${formData.eventName} is ready! You can now publish it.`);
     } catch (err) {
       setTxStatus('error');
-      setError(err instanceof Error ? err.message : 'Failed to create event');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create event';
+      // Make error user-friendly
+      let friendlyError = errorMessage;
+      if (errorMessage.includes('user rejected') || errorMessage.includes('cancelled')) {
+        friendlyError = 'You cancelled the transaction. No worries - your event details are saved.';
+      } else if (errorMessage.includes('insufficient')) {
+        friendlyError = 'Your wallet doesn\'t have enough ADA to create this event.';
+      }
+      setError(friendlyError);
+      toast.error('Event Creation Failed', friendlyError);
       console.error('Event creation error:', err);
     } finally {
       setIsSubmitting(false);

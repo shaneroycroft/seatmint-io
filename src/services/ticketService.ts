@@ -54,10 +54,22 @@ import {
 // TYPE DEFINITIONS (matching Aiken types)
 // ============================================
 
+// Aiken Address structure: Address { payment_credential: Credential, stake_credential: Option<StakeCredential> }
+// Credential = VerificationKey(hash) | Script(hash)
+const CredentialSchema = Data.Enum([
+  Data.Object({ VerificationKey: Data.Tuple([Data.Bytes()]) }),
+  Data.Object({ Script: Data.Tuple([Data.Bytes()]) }),
+]);
+
+const AddressSchema = Data.Object({
+  payment_credential: CredentialSchema,
+  stake_credential: Data.Nullable(CredentialSchema),
+});
+
 // GlobalSettings datum schema
 const GlobalSettingsSchema = Data.Object({
   platform_fee_bps: Data.Integer(),
-  platform_treasury: Data.Bytes(),
+  platform_treasury: AddressSchema,
   is_market_active: Data.Boolean(),
   current_max_supply: Data.Integer(),
   max_resale_multiplier: Data.Integer(),
@@ -84,14 +96,15 @@ const _MintActionSchema = Data.Enum([
 void _MintActionSchema;
 
 // TicketDatum schema (secondary market listings)
+// Note: artist and seller are Address types in Aiken
 const TicketDatumSchema = Data.Object({
   event_policy: Data.Bytes(),
   token_name: Data.Bytes(),
   original_mint_price: Data.Integer(),
   price: Data.Integer(),
-  artist: Data.Bytes(),
+  artist: AddressSchema,
   royalty_rate: Data.Integer(),
-  seller: Data.Bytes(),
+  seller: AddressSchema,
   event_id: Data.Bytes(),
   seat_number: Data.Nullable(Data.Integer()),
 });
@@ -134,14 +147,56 @@ function addressToPkh(address: string): string {
   return details.paymentCredential.hash;
 }
 
+/**
+ * Build Aiken-compatible Address Constr from a payment key hash
+ *
+ * Aiken Address structure:
+ *   Address { payment_credential: Credential, stake_credential: Option<StakeCredential> }
+ *
+ * Credential = VerificationKey(hash) | Script(hash)
+ *   - VerificationKey = Constr(0, [hash])
+ *   - Script = Constr(1, [hash])
+ *
+ * Option = Some(value) | None
+ *   - Some = Constr(0, [value])
+ *   - None = Constr(1, [])
+ */
+function pkhToAikenAddress(pkh: string): Constr<unknown> {
+  // payment_credential: VerificationKey(pkh) = Constr(0, [pkh])
+  const paymentCredential = new Constr(0, [pkh]);
+  // stake_credential: None = Constr(1, [])
+  const stakeCredential = new Constr(1, []);
+  // Address = Constr(0, [payment_credential, stake_credential])
+  return new Constr(0, [paymentCredential, stakeCredential]);
+}
+
+/**
+ * Extract payment key hash from decoded Aiken Address schema
+ * The decoded AddressSchema has shape: { payment_credential: { VerificationKey: [pkh] } | { Script: [hash] }, ... }
+ */
+type DecodedAddress = {
+  payment_credential: { VerificationKey: [string] } | { Script: [string] };
+  stake_credential: unknown;
+};
+
+function aikenAddressToPkh(address: DecodedAddress): string {
+  const cred = address.payment_credential;
+  if ('VerificationKey' in cred) {
+    return cred.VerificationKey[0];
+  } else if ('Script' in cred) {
+    return cred.Script[0];
+  }
+  throw new Error('Invalid address credential');
+}
+
 // ============================================
 // SETTINGS UTxO LOADING
 // ============================================
 
 /**
- * Get platform settings UTxO (referenced by all transactions)
+ * Get platform settings UTxO and policy ID (referenced by all transactions)
  */
-async function getSettingsUTxO(lucid: LucidEvolution): Promise<UTxO> {
+async function getSettingsUTxO(lucid: LucidEvolution): Promise<{ utxo: UTxO; settingsPolicyId: string }> {
   const { data, error } = await supabase
     .from('platform_config')
     .select('settings_policy_id, settings_utxo_ref')
@@ -160,7 +215,7 @@ async function getSettingsUTxO(lucid: LucidEvolution): Promise<UTxO> {
     throw new Error('Settings UTxO not found on chain');
   }
 
-  return utxos[0];
+  return { utxo: utxos[0], settingsPolicyId: data.settings_policy_id };
 }
 
 // ============================================
@@ -218,17 +273,26 @@ export async function createEvent(
   }
 
   // Step 4: Get settings for validation
-  const settingsUTxO = await getSettingsUTxO(lucid);
-  const settings = Data.from(settingsUTxO.datum!, GlobalSettingsSchema);
+  const { utxo: settingsUTxO, settingsPolicyId } = await getSettingsUTxO(lucid);
+  // Validate settings can be decoded (even though we don't use the value here)
+  try {
+    Data.from(settingsUTxO.datum!, GlobalSettingsSchema);
+  } catch (e) {
+    throw new Error(
+      'Failed to decode platform settings. The settings datum format may be outdated. ' +
+      'Please re-initialize platform settings with initializePlatformSettings(). ' +
+      `Original error: ${e instanceof Error ? e.message : String(e)}`
+    );
+  }
 
-  // Step 5: Apply parameters to primary sale validator
-  const primarySaleValidator = applyPrimarySaleParams(settings.platform_treasury);
+  // Step 5: Apply parameters to primary sale validator (using settings policy ID, not treasury)
+  const primarySaleValidator = applyPrimarySaleParams(settingsPolicyId);
   const boxOfficeHash = validatorToScriptHash(primarySaleValidator);
 
   // Step 6: Apply parameters to event mint policy
   const mintingPolicyValidator = applyEventMintParams(
     organizerPKH,
-    settings.platform_treasury,
+    settingsPolicyId,
     boxOfficeHash
   );
 
@@ -268,22 +332,23 @@ export async function createEvent(
       ]))
     : buildOption(null);
 
-  // Build pricing strategy: Enum (FixedPrice=0, EarlyBird=1, Tiered=2)
+  // Build pricing strategy: Enum (FixedPrice=0)
+  // PricingStrategy::FixedPrice { price } = Constr(0, [price])
   let pricingStrategyConstr: Constr<unknown>;
   if (firstTier.earlyBirdPriceAda && firstTier.earlyBirdDeadline) {
-    // EarlyBird = Constr(1, [Constr(0, [early_price, deadline])])
-    pricingStrategyConstr = new Constr(1, [new Constr(0, [
-      adaToLovelace(firstTier.earlyBirdPriceAda),
-      dateToPosixTime(firstTier.earlyBirdDeadline),
-    ])]);
+    // EarlyBird would be Constr(1, [early_price, deadline]) if implemented
+    // For now, fall back to FixedPrice
+    pricingStrategyConstr = new Constr(0, [basePriceLovelace]);
   } else {
-    // FixedPrice = Constr(0, [Constr(0, [price])])
-    pricingStrategyConstr = new Constr(0, [new Constr(0, [basePriceLovelace])]);
+    // FixedPrice { price } = Constr(0, [price])
+    pricingStrategyConstr = new Constr(0, [basePriceLovelace]);
   }
 
   // Build SaleDatum: Constr(0, [organizer_address, base_price, event_policy, sale_window, anti_scalping, whitelist, pricing])
+  // organizer_address must be a full Aiken Address structure, not just a PKH
+  const organizerAddressConstr = pkhToAikenAddress(organizerPKH);
   const saleDatumConstr = new Constr(0, [
-    organizerPKH,
+    organizerAddressConstr,
     basePriceLovelace,
     policyId,
     saleWindowConstr,
@@ -364,13 +429,13 @@ export async function purchaseTickets(
   if (!EVENT_MINT_VALIDATOR || !PRIMARY_SALE_VALIDATOR) {
     throw new Error('Validators not found in plutus.json. Run `aiken build` first.');
   }
-  const settingsUTxO = await getSettingsUTxO(lucid);
+  const { utxo: settingsUTxO, settingsPolicyId } = await getSettingsUTxO(lucid);
   const settings = Data.from(settingsUTxO.datum!, GlobalSettingsSchema);
 
-  // Step 4: Apply parameters to validators
-  const primarySaleValidator = applyPrimarySaleParams(settings.platform_treasury);
+  // Step 4: Apply parameters to validators (using settings policy ID)
+  const primarySaleValidator = applyPrimarySaleParams(settingsPolicyId);
 
-  // Step 5: Find sale UTxO (box office)
+  // Step 5: Find sale UTxO (box office) for this specific event
   const network = lucid.config().network;
   if (!network) throw new Error('Network not configured');
   const saleAddress = validatorToAddress(network, primarySaleValidator);
@@ -380,7 +445,28 @@ export async function purchaseTickets(
     throw new Error('Sale UTxO not found');
   }
 
-  const saleUTxO = saleUTxOs[0];
+  // Find the sale UTxO that matches this event's policy ID
+  // The SaleDatum contains event_policy which should match tier.events.event_policy_id
+  const eventPolicyId = tier.events.event_policy_id;
+  const saleUTxO = saleUTxOs.find(utxo => {
+    if (!utxo.datum) return false;
+    try {
+      // Decode the datum to check the event_policy field
+      // SaleDatum structure: Constr(0, [organizer_address, base_price, event_policy, ...])
+      const decoded = Data.from(utxo.datum);
+      if (decoded instanceof Constr && decoded.fields.length >= 3) {
+        const datumEventPolicy = decoded.fields[2] as string;
+        return datumEventPolicy === eventPolicyId;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  });
+
+  if (!saleUTxO) {
+    throw new Error(`Sale UTxO not found for event policy ${eventPolicyId}`);
+  }
 
   // Step 5: Generate ticket token names
   const ticketNames = await generateTicketNames(
@@ -422,7 +508,7 @@ export async function purchaseTickets(
   // Step 12: Apply parameters to event mint policy
   const mintingPolicyValidator = applyEventMintParams(
     organizerPKH,
-    settings.platform_treasury,
+    settingsPolicyId,
     boxOfficeHash
   );
 
@@ -436,6 +522,12 @@ export async function purchaseTickets(
   // Mint redeemer: Constr 0 for Mint
   const mintRedeemerData = new Constr(0, []);
 
+  // IMPORTANT: The organizer address in the SaleDatum was created using pkhToAikenAddress,
+  // which produces an Address with stake_credential: None. The validator does an exact
+  // address comparison, so we must pay to an address with the same structure (no stake).
+  // Use pkhToAddress to create an address from just the PKH, matching the datum.
+  const organizerPaymentAddress = pkhToAddress(organizerPKH, network);
+
   const tx = await lucid
     .newTx()
     .collectFrom(
@@ -447,10 +539,10 @@ export async function purchaseTickets(
       mintAssets,
       Data.to(mintRedeemerData)
     )
-    .pay.ToAddress(tier.events.organizer_wallet_address, {
+    .pay.ToAddress(organizerPaymentAddress, {
       lovelace: organizerPayment
     })
-    .pay.ToAddress(pkhToAddress(settings.platform_treasury, network), {
+    .pay.ToAddress(pkhToAddress(aikenAddressToPkh(settings.platform_treasury as DecodedAddress), network), {
       lovelace: platformFee
     })
     .pay.ToAddressWithData(
@@ -512,8 +604,9 @@ export async function listTicketForResale(
   const sellerAddress = await lucid.wallet().address();
 
   // Get settings for applying params
-  const settingsUTxO = await getSettingsUTxO(lucid);
-  const settings = Data.from(settingsUTxO.datum!, GlobalSettingsSchema);
+  const { utxo: settingsUTxO, settingsPolicyId } = await getSettingsUTxO(lucid);
+  const _settings = Data.from(settingsUTxO.datum!, GlobalSettingsSchema);
+  void _settings; // Validate decoding works but value not used in this function
 
   const sellerUTxOs = await lucid.wallet().getUtxos();
   const ticketUTxO = sellerUTxOs.find((utxo: UTxO) =>
@@ -528,34 +621,28 @@ export async function listTicketForResale(
 
   const tier = event.ticket_tiers[0];
 
-  // Build ticket datum with proper type annotations
-  const ticketDatumValue: TicketDatum = {
-    event_policy: event.event_policy_id,
-    token_name: fromText(params.ticketAssetName),
-    original_mint_price: BigInt(tier.price_lovelace),
-    price: adaToLovelace(params.priceAda), // ADA -> Lovelace conversion
-    artist: event.organizer_wallet_address,
-    royalty_rate: 1000n, // 10% in basis points
-    seller: sellerAddress,
-    event_id: fromText(params.eventId),
-    seat_number: null,
-  };
+  // Build ticket datum with proper Aiken Address types
+  // Extract PKHs from bech32 addresses
+  const artistPkh = addressToPkh(event.organizer_wallet_address);
+  const sellerPkh = addressToPkh(sellerAddress);
+
   // Convert to Constr format for Lucid
+  // artist and seller must be full Aiken Address structures
   const ticketDatumConstr = new Constr(0, [
-    ticketDatumValue.event_policy,
-    ticketDatumValue.token_name,
-    ticketDatumValue.original_mint_price,
-    ticketDatumValue.price,
-    ticketDatumValue.artist,
-    ticketDatumValue.royalty_rate,
-    ticketDatumValue.seller,
-    ticketDatumValue.event_id,
-    ticketDatumValue.seat_number === null ? new Constr(1, []) : new Constr(0, [ticketDatumValue.seat_number]),
+    event.event_policy_id,                      // event_policy: PolicyId (bytes)
+    fromText(params.ticketAssetName),           // token_name: AssetName (bytes)
+    BigInt(tier.price_lovelace),                // original_mint_price: Int
+    adaToLovelace(params.priceAda),             // price: Int
+    pkhToAikenAddress(artistPkh),               // artist: Address
+    1000n,                                      // royalty_rate: Int (10% in basis points)
+    pkhToAikenAddress(sellerPkh),               // seller: Address
+    fromText(params.eventId),                   // event_id: ByteArray
+    new Constr(1, []),                          // seat_number: None
   ]);
   const ticketDatum = Data.to(ticketDatumConstr);
 
   // Apply parameters to storefront validator
-  const storefrontValidator = applyStorefrontParams(settings.platform_treasury);
+  const storefrontValidator = applyStorefrontParams(settingsPolicyId);
 
   const network = lucid.config().network;
   if (!network) throw new Error('Network not configured');
@@ -628,11 +715,11 @@ export async function purchaseFromStorefront(
   }
 
   // Get settings
-  const settingsUTxO = await getSettingsUTxO(lucid);
+  const { utxo: settingsUTxO, settingsPolicyId } = await getSettingsUTxO(lucid);
   const settings = Data.from(settingsUTxO.datum!, GlobalSettingsSchema);
 
   // Apply parameters to storefront validator
-  const storefrontValidator = applyStorefrontParams(settings.platform_treasury);
+  const storefrontValidator = applyStorefrontParams(settingsPolicyId);
 
   // Parse listing UTxO reference
   const [txHash, outputIndexStr] = params.listingUtxoRef.split('#');
@@ -646,7 +733,8 @@ export async function purchaseFromStorefront(
   const listingUtxo = listingUtxos[0];
 
   // Decode the ticket datum to get payment info
-  const ticketDatum = Data.from<TicketDatum>(listingUtxo.datum!);
+  // Note: We use unknown cast because Lucid's Data.from return type doesn't perfectly match TypeScript inference
+  const ticketDatum = Data.from(listingUtxo.datum!, TicketDatumSchema) as unknown as TicketDatum;
 
   // Get buyer address
   const buyerAddress = await lucid.wallet().address();
@@ -672,10 +760,10 @@ export async function purchaseFromStorefront(
   if (!network) throw new Error('Network not configured');
 
   // Build transaction
-  // Convert PKHs to addresses
-  const sellerAddr = pkhToAddress(ticketDatum.seller, network);
-  const artistAddr = pkhToAddress(ticketDatum.artist, network);
-  const treasuryAddr = pkhToAddress(settings.platform_treasury, network);
+  // Convert decoded Aiken Addresses to bech32 addresses
+  const sellerAddr = pkhToAddress(aikenAddressToPkh(ticketDatum.seller as DecodedAddress), network);
+  const artistAddr = pkhToAddress(aikenAddressToPkh(ticketDatum.artist as DecodedAddress), network);
+  const treasuryAddr = pkhToAddress(aikenAddressToPkh(settings.platform_treasury as DecodedAddress), network);
 
   const tx = await lucid
     .newTx()
@@ -742,11 +830,12 @@ export async function cancelStorefrontListing(
   }
 
   // Get settings
-  const settingsUTxO = await getSettingsUTxO(lucid);
-  const settings = Data.from(settingsUTxO.datum!, GlobalSettingsSchema);
+  const { utxo: settingsUTxO, settingsPolicyId } = await getSettingsUTxO(lucid);
+  const _settings = Data.from(settingsUTxO.datum!, GlobalSettingsSchema);
+  void _settings; // Validate decoding works but value not used in this function
 
   // Apply parameters to storefront validator
-  const storefrontValidator = applyStorefrontParams(settings.platform_treasury);
+  const storefrontValidator = applyStorefrontParams(settingsPolicyId);
 
   // Parse listing UTxO reference
   const [txHash, outputIndexStr] = params.listingUtxoRef.split('#');
@@ -760,11 +849,15 @@ export async function cancelStorefrontListing(
   const listingUtxo = listingUtxos[0];
 
   // Decode the ticket datum to verify seller
-  const ticketDatum = Data.from<TicketDatum>(listingUtxo.datum!);
+  // Note: We use unknown cast because Lucid's Data.from return type doesn't perfectly match TypeScript inference
+  const ticketDatum = Data.from(listingUtxo.datum!, TicketDatumSchema) as unknown as TicketDatum;
 
   // Verify caller is the seller
+  // The seller field is an Aiken Address type, so we need to extract the PKH
   const sellerAddress = await lucid.wallet().address();
-  if (ticketDatum.seller !== sellerAddress) {
+  const sellerPKH = paymentCredentialOf(sellerAddress).hash;
+  const datumSellerPKH = aikenAddressToPkh(ticketDatum.seller as DecodedAddress);
+  if (datumSellerPKH !== sellerPKH) {
     throw new Error('Only the seller can cancel this listing');
   }
 
@@ -1043,16 +1136,19 @@ export async function initializePlatformSettings(
   console.log('Settings Policy ID:', settingsPolicyId);
 
   // Step 3: Build GlobalSettings datum using Constr
-  // Fields order: platform_fee_bps, platform_treasury, is_market_active, current_max_supply, max_resale_multiplier, admin_pkh
+  // Fields order (from types.ak): platform_fee_bps, platform_treasury, is_market_active, current_max_supply, max_resale_multiplier, admin_pkh
+  // platform_treasury is an Address type, not just bytes - use pkhToAikenAddress helper
   // Boolean is represented as Constr(0, []) for False, Constr(1, []) for True in Plutus
-  const settingsDatum = Data.to(new Constr(0, [
+  const treasuryAddressConstr = pkhToAikenAddress(adminPKH);
+  const settingsDatumConstr = new Constr(0, [
     platformFeeBps,                              // Integer
-    adminPKH,                                    // Bytes (hex string)
+    treasuryAddressConstr,                       // Address (not just bytes!)
     new Constr(isMarketActive ? 1 : 0, []),      // Boolean as Constr
     currentMaxSupply,                            // Integer
     maxResaleMultiplier,                         // Integer
-    adminPKH,                                    // Bytes (hex string)
-  ]));
+    adminPKH,                                    // VerificationKeyHash (bytes)
+  ]);
+  const settingsDatum = Data.to(settingsDatumConstr as Data);
 
   // Step 4: Build and submit transaction
   const tx = await lucid
@@ -1132,12 +1228,12 @@ export async function getPlatformSettings(lucid: LucidEvolution): Promise<{
   maxResaleMultiplier: number;
   adminPkh: string;
 }> {
-  const settingsUTxO = await getSettingsUTxO(lucid);
+  const { utxo: settingsUTxO } = await getSettingsUTxO(lucid);
   const settings = Data.from(settingsUTxO.datum!, GlobalSettingsSchema);
 
   return {
     platformFeeBps: Number(settings.platform_fee_bps),
-    platformTreasury: settings.platform_treasury,
+    platformTreasury: aikenAddressToPkh(settings.platform_treasury as DecodedAddress),
     isMarketActive: settings.is_market_active,
     currentMaxSupply: Number(settings.current_max_supply),
     maxResaleMultiplier: Number(settings.max_resale_multiplier),
@@ -1156,4 +1252,26 @@ export async function isSettingsInitialized(): Promise<boolean> {
     .single();
 
   return !error && data?.settings_policy_id != null;
+}
+
+/**
+ * Reset platform settings in database
+ *
+ * Call this before re-initializing platform settings if the on-chain
+ * settings datum format is outdated (e.g., after validator schema changes).
+ *
+ * WARNING: This only clears the database reference. The old settings NFT
+ * will remain on-chain but will no longer be used.
+ */
+export async function resetPlatformSettings(): Promise<void> {
+  const { error } = await supabase
+    .from('platform_config')
+    .update({ settings_policy_id: null, settings_utxo_ref: null })
+    .eq('id', 'main');
+
+  if (error) {
+    throw new Error(`Failed to reset platform settings: ${error.message}`);
+  }
+
+  console.log('Platform settings reset. Call initializePlatformSettings() to create new settings.');
 }

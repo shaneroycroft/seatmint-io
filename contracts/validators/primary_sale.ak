@@ -11,7 +11,7 @@ use cardano/transaction.{
   InlineDatum, Input, Output, OutputReference, Transaction, ValidityRange,
   placeholder,
 }
-use types.{GlobalSettings, SaleDatum, SaleRedeemer, TimeWindow, AntiScalpingRules, Whitelist, PricingStrategy, PricingStrategy.FixedPrice}
+use types.{GlobalSettings, SaleDatum, SaleRedeemer, TimeWindow, AntiScalpingRules, Whitelist, PricingStrategy, FixedPrice}
 
 /// Primary Sale Validator (Box Office) - Extensible Design
 /// 
@@ -240,11 +240,16 @@ fn mock_settings_input(
   is_active: Bool,
   fee_bps: Int,
 ) -> Input {
+  let treasury_address = mock_address(#"1111111111111111111111111111111111111111111111111111111111")
+  let admin_pkh = #"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   let settings_datum =
     GlobalSettings {
+      platform_fee_bps: fee_bps,
+      platform_treasury: treasury_address,
       is_market_active: is_active,
       current_max_supply: 1000,
-      platform_fee_bps: fee_bps,
+      max_resale_multiplier: 300,
+      admin_pkh: admin_pkh,
     }
 
   Input {

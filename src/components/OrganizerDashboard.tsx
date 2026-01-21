@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { CreateEvent } from './CreateEvent';
+import { useToast } from '../contexts/ToastContext';
 
 interface TicketTier {
   id: string;
@@ -46,10 +47,10 @@ export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ lucid, u
   const [loading, setLoading] = useState(true);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [activeView, setActiveView] = useState<DashboardView>('events');
-  const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<EditFormData | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     loadEvents();
@@ -78,7 +79,7 @@ export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ lucid, u
       console.log('Loaded events:', data?.length || 0);
     } catch (err) {
       console.error('Failed to load events:', err);
-      setError('Failed to load your events. Check console for details.');
+      toast.error('Unable to Load Events', 'Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -86,7 +87,6 @@ export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ lucid, u
 
   const handleStatusChange = async (eventId: string, newStatus: 'published' | 'completed') => {
     setActionLoading(eventId);
-    setError(null);
     try {
       console.log('Updating event status:', { eventId, newStatus });
       const { data, error } = await supabase
@@ -105,9 +105,11 @@ export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ lucid, u
       // Refresh events
       await loadEvents();
       setSelectedEvent(null);
+      const statusMessage = newStatus === 'published' ? 'Your event is now live!' : 'Sales have been ended for this event.';
+      toast.success('Event Updated', statusMessage);
     } catch (err: any) {
       console.error('Failed to update event:', err);
-      setError(`Failed to update event: ${err.message || 'Unknown error'}`);
+      toast.error('Update Failed', 'We couldn\'t update your event. Please try again.');
     } finally {
       setActionLoading(null);
     }
@@ -119,7 +121,6 @@ export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ lucid, u
     }
 
     setActionLoading(eventId);
-    setError(null);
     try {
       // First delete ticket tiers (foreign key constraint)
       const { error: tiersError } = await supabase
@@ -143,9 +144,10 @@ export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ lucid, u
 
       await loadEvents();
       setSelectedEvent(null);
+      toast.success('Event Deleted', 'Your event has been removed.');
     } catch (err: any) {
       console.error('Failed to delete event:', err);
-      setError(`Failed to delete event: ${err.message || 'Unknown error'}`);
+      toast.error('Delete Failed', 'We couldn\'t delete your event. Please try again.');
     } finally {
       setActionLoading(null);
     }
@@ -176,7 +178,6 @@ export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ lucid, u
     if (!selectedEvent || !editForm) return;
 
     setActionLoading(selectedEvent.id);
-    setError(null);
 
     try {
       // Update event details
@@ -219,9 +220,10 @@ export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ lucid, u
       if (updatedEvent) {
         setSelectedEvent(updatedEvent);
       }
+      toast.success('Changes Saved', 'Your event has been updated.');
     } catch (err: any) {
       console.error('Failed to save changes:', err);
-      setError(`Failed to save changes: ${err.message || 'Unknown error'}`);
+      toast.error('Save Failed', 'We couldn\'t save your changes. Please try again.');
     } finally {
       setActionLoading(null);
     }
@@ -327,13 +329,6 @@ export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ lucid, u
             </button>
           </div>
         </div>
-
-        {/* Error Display */}
-        {error && (
-          <div className="mx-6 mt-4 p-4 bg-red-50 border border-red-200 rounded-xl">
-            <p className="text-sm text-red-700">{error}</p>
-          </div>
-        )}
 
         {/* Events List */}
         {events.length === 0 ? (
