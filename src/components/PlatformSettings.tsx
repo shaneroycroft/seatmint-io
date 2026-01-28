@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { resetPlatformSettings, initializePlatformSettings, isSettingsInitialized } from '../services/ticketService';
+import { burnSettingsNft, initializePlatformSettings, isSettingsInitialized, resetPlatformSettings } from '../services/ticketService';
 
 interface PlatformSettingsProps {
   lucid: any;
@@ -43,7 +43,34 @@ export const PlatformSettings: React.FC<PlatformSettingsProps> = ({ lucid, admin
       return;
     }
 
-    if (!confirm('This will create NEW on-chain settings. The old settings NFT will be abandoned. Continue?')) {
+    // First warning - explain what will happen
+    const firstConfirm = confirm(
+      '⚠️ WARNING: Reset & Re-initialize Settings\n\n' +
+      'This action will:\n' +
+      '1. BURN the existing Settings NFT on-chain\n' +
+      '2. Create a NEW Settings NFT with a new Policy ID\n\n' +
+      '❌ IMPORTANT: All existing events will become UNUSABLE!\n' +
+      'Events are tied to the settings policy ID. After reset, you must create new events.\n\n' +
+      'Do you want to continue?'
+    );
+
+    if (!firstConfirm) return;
+
+    // Second warning - final confirmation
+    const secondConfirm = confirm(
+      '🔥 FINAL CONFIRMATION\n\n' +
+      'You are about to permanently burn the Settings NFT.\n' +
+      'This requires TWO wallet signatures:\n' +
+      '  1. Burn the old Settings NFT\n' +
+      '  2. Mint the new Settings NFT\n\n' +
+      'Type "BURN" in the next prompt to confirm, or click Cancel to abort.'
+    );
+
+    if (!secondConfirm) return;
+
+    const burnConfirm = prompt('Type BURN to confirm:');
+    if (burnConfirm !== 'BURN') {
+      alert('Reset cancelled. You must type "BURN" exactly to proceed.');
       return;
     }
 
@@ -51,11 +78,28 @@ export const PlatformSettings: React.FC<PlatformSettingsProps> = ({ lucid, admin
     setError(null);
 
     try {
-      // Step 1: Reset database reference
-      await resetPlatformSettings();
-      console.log('Database reference cleared');
+      let burnTxHash: string | null = null;
 
-      // Step 2: Re-initialize on-chain
+      // Step 1: Try to burn the existing Settings NFT
+      // If the UTxO is already gone (testnet reset, spent, etc.), skip burn and just reset DB
+      console.log('Step 1: Attempting to burn existing Settings NFT...');
+      try {
+        burnTxHash = await burnSettingsNft(lucid);
+        console.log('Settings NFT burned! TX:', burnTxHash);
+      } catch (burnError) {
+        const errorMsg = burnError instanceof Error ? burnError.message : String(burnError);
+        if (errorMsg.includes('not found on chain') || errorMsg.includes('UTxO not found')) {
+          console.log('Settings NFT already gone from chain (testnet reset?). Resetting database reference...');
+          await resetPlatformSettings();
+          console.log('Database reference cleared.');
+        } else {
+          // Re-throw if it's a different error
+          throw burnError;
+        }
+      }
+
+      // Step 2: Re-initialize on-chain with new Settings NFT
+      console.log('Step 2: Creating new Settings NFT...');
       const result = await initializePlatformSettings(lucid, {
         platformFeeBps: 250,      // 2.5%
         isMarketActive: true,
@@ -64,7 +108,12 @@ export const PlatformSettings: React.FC<PlatformSettingsProps> = ({ lucid, admin
       });
 
       console.log('New settings created:', result);
-      alert(`Success! New Settings Policy ID: ${result.settingsPolicyId}`);
+      alert(
+        '✅ Settings Reset Complete!\n\n' +
+        (burnTxHash ? `Burn TX: ${burnTxHash}\n` : '(Old NFT was already gone from chain)\n') +
+        `New Settings Policy ID: ${result.settingsPolicyId}\n\n` +
+        'Remember: You must create new events - old events will not work.'
+      );
 
       // Refresh state
       await loadSettings();
@@ -365,19 +414,22 @@ export const PlatformSettings: React.FC<PlatformSettingsProps> = ({ lucid, admin
             </div>
           </div>
 
-          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-4">
-            <p className="text-orange-800 text-sm">
-              <strong>Warning:</strong> Use this if the on-chain settings datum format is outdated
-              (e.g., after validator schema changes). This will create a NEW settings NFT on-chain.
-            </p>
+          <div className="bg-red-50 border border-red-300 rounded-xl p-4 mb-4">
+            <p className="text-red-800 text-sm font-bold mb-2">⚠️ Destructive Action</p>
+            <ul className="text-red-700 text-sm space-y-1 list-disc list-inside">
+              <li>Burns the existing Settings NFT permanently</li>
+              <li>Creates a new Settings NFT with a different Policy ID</li>
+              <li><strong>All existing events will become unusable</strong></li>
+              <li>You must create new events after reset</li>
+            </ul>
           </div>
 
           <button
             onClick={handleResetAndReinitialize}
-            disabled={reinitializing || !lucid}
-            className="w-full py-4 rounded-xl font-bold text-white bg-orange-500 hover:bg-orange-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={reinitializing || !lucid || !onChainInitialized}
+            className="w-full py-4 rounded-xl font-bold text-white bg-red-500 hover:bg-red-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {reinitializing ? 'Re-initializing... (Check wallet for signature)' : 'Reset & Re-initialize On-Chain Settings'}
+            {reinitializing ? 'Processing... (Check wallet for signatures)' : '🔥 Burn & Reset Settings NFT'}
           </button>
 
           {!lucid && (

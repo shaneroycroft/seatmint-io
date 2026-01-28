@@ -1,25 +1,20 @@
 use aiken/collection/dict
 use aiken/collection/list
 use aiken/crypto.{VerificationKeyHash}
-use aiken/interval.{Finite, Interval, IntervalBound}
-use aiken/option
-use aiken/primitive/bytearray
 use cardano/address.{Address, Credential, VerificationKey}
-use cardano/address/credential
-use cardano/assets.{PolicyId, quantity_of, zero, from_lovelace, from_asset}
+use cardano/assets.{PolicyId, quantity_of, from_lovelace, from_asset}
 use cardano/transaction.{
-  InlineDatum, Input, Output, OutputReference, Transaction, ValidityRange,
-  placeholder,
+  InlineDatum, Input, Output, OutputReference, Transaction, placeholder,
 }
-use types.{GlobalSettings, SaleDatum, SaleRedeemer, TimeWindow, AntiScalpingRules, Whitelist, PricingStrategy, FixedPrice}
+use types.{GlobalSettings, SaleDatum, SaleRedeemer, MarketStatus, Active, Inactive}
 
-/// Primary Sale Validator (Box Office) - Extensible Design
-/// 
-/// This validator manages initial ticket sales with support for:
-/// - ✅ MVP: Basic sales with market control
-/// - 🔮 Future: Presales, anti-scalping, dynamic pricing, time windows
-/// 
-/// Architecture allows adding features without breaking existing sales
+/// Primary Sale Validator (Box Office) - Simplified for MVP
+///
+/// Basic buy flow:
+/// 1. Market must be active
+/// 2. Buyer must sign transaction
+/// 3. Correct payment to organizer (minus platform fee)
+/// 4. Correct number of NFTs minted
 validator primary_sale(settings_token: PolicyId) {
   spend(
     datum_opt: Option<Data>,
@@ -27,14 +22,23 @@ validator primary_sale(settings_token: PolicyId) {
     _own_ref: OutputReference,
     self: Transaction,
   ) {
+    trace @"1_start": True
+
     // Decode the datum (contains sale configuration)
     expect Some(datum_raw) = datum_opt
+    trace @"2_datum_some": True
+
     expect sale_datum: SaleDatum = datum_raw
+    trace @"3_sale_datum_decoded": True
 
     // Decode the redeemer (purchase action)
     expect sale_redeemer: SaleRedeemer = redeemer
+    trace @"4_redeemer_decoded": True
 
-    // Get global platform settings
+    // Get global platform settings from reference input
+    trace @"5_looking_for_settings": True
+    trace @"5a_ref_input_count": list.length(self.reference_inputs)
+
     expect Some(settings_input) =
       list.find(
         self.reference_inputs,
@@ -42,189 +46,64 @@ validator primary_sale(settings_token: PolicyId) {
           quantity_of(input.output.value, settings_token, "Settings") == 1
         },
       )
+    trace @"6_settings_found": True
 
     expect InlineDatum(settings_raw) = settings_input.output.datum
+    trace @"7_settings_inline": True
+
     expect settings: GlobalSettings = settings_raw
+    trace @"8_settings_decoded": True
 
-    // ============================================
-    // VALIDATION PIPELINE
-    // Each check can be enabled/disabled per event
-    // ============================================
+    // 1. Market must be active
+    let market_active = settings.is_market_active == Active
+    trace @"9_market_active": market_active
 
-    // 1. Platform-Level Check (Always Required)
-    let market_active = validate_market_active(settings)
+    // 2. Buyer must sign transaction
+    let buyer_signed = list.has(self.extra_signatories, sale_redeemer.buyer_pkh)
+    trace @"10_buyer_signed": buyer_signed
 
-    // 2. Time Window Check (Optional - for presales/limited windows)
-    let time_valid = validate_time_window(sale_datum, self)
+    // 3. Calculate and validate payment
+    let total_payment = sale_datum.base_price * sale_redeemer.quantity
+    let platform_fee = (total_payment * settings.platform_fee_bps) / 10000
+    let net_to_organizer = total_payment - platform_fee
+    trace @"11_payment_calc": net_to_organizer
 
-    // 3. Anti-Scalping Check (Optional - prevent bulk buying)
-    let anti_scalping =
-      validate_purchase_limits(sale_datum, sale_redeemer, self)
+    let payment_valid =
+      when
+        list.find(
+          self.outputs,
+          fn(output: Output) { output.address == sale_datum.organizer_address },
+        )
+      is {
+        None -> {
+          trace @"12_no_organizer_output": False
+          False
+        }
+        Some(organizer_output) -> {
+          let lovelace_received = assets.lovelace_of(organizer_output.value)
+          trace @"12_lovelace_received": lovelace_received
+          lovelace_received >= net_to_organizer
+        }
+      }
+    trace @"13_payment_valid": payment_valid
 
-    // 4. Whitelist Check (Optional - presale access control)
-    let whitelist_valid = validate_whitelist(sale_datum, self)
+    // 4. Verify correct NFTs are minted
+    let minted_tokens = assets.tokens(self.mint, sale_datum.event_policy)
+    let total_minted =
+      dict.foldl(minted_tokens, 0, fn(_name, qty, acc) { acc + qty })
+    trace @"14_total_minted": total_minted
+    let nft_minted = total_minted == sale_redeemer.quantity
+    trace @"15_nft_minted": nft_minted
 
-    // 5. Pricing Validation (Always Required)
-    let pricing_valid = validate_pricing(sale_datum, sale_redeemer)
-
-    // 6. Payment Validation (Always Required)
-    let payment_valid = validate_payment(sale_datum, sale_redeemer, self, settings)
-
-    // 7. Buyer Authorization (Always Required)
-    let buyer_authorized = list.has(self.extra_signatories, sale_redeemer.buyer_pkh)
-
-    // 8. NFT Minting Check (Ensure ticket NFT is minted)
-    let nft_minted = validate_nft_minting(sale_datum, sale_redeemer, self)
-
-    // Combine all validations
-    market_active && time_valid && anti_scalping && whitelist_valid && pricing_valid && payment_valid && buyer_authorized && nft_minted
+    // All conditions must pass
+    let result = market_active && buyer_signed && payment_valid && nft_minted
+    trace @"16_final_result": result
+    result
   }
 
   else(_) {
     fail
   }
-}
-
-// ============================================
-// VALIDATION FUNCTIONS
-// Each feature is modular and can be toggled
-// ============================================
-
-/// 1. Market Active (MVP - Always On)
-fn validate_market_active(settings: GlobalSettings) -> Bool {
-  settings.is_market_active == True
-}
-
-/// 2. Time Window Validation (Optional Feature)
-/// Checks if current time is within sale window
-fn validate_time_window(datum: SaleDatum, tx: Transaction) -> Bool {
-  when datum.sale_window is {
-    // No time restriction - always valid
-    None -> True
-    // Time window defined - check bounds
-    Some(window) -> {
-      // Get transaction validity range
-      let valid_range = tx.validity_range
-
-      // Extract lower bound time (must be after start_time)
-      let after_start =
-        when valid_range.lower_bound is {
-          IntervalBound { bound_type: Finite(time), .. } ->
-            time >= window.start_time
-          _ -> False
-        }
-
-      // Extract upper bound time (must be before end_time)
-      let before_end =
-        when valid_range.upper_bound is {
-          IntervalBound { bound_type: Finite(time), .. } -> time <= window.end_time
-          _ -> False
-        }
-
-      after_start && before_end
-    }
-  }
-}
-
-/// 3. Anti-Scalping Validation (Optional Feature)
-/// Prevents bulk buying and enforces per-wallet limits
-fn validate_purchase_limits(
-  datum: SaleDatum,
-  redeemer: SaleRedeemer,
-  _tx: Transaction,
-) -> Bool {
-  when datum.anti_scalping_rules is {
-    // No anti-scalping - always valid
-    None -> True
-    // Anti-scalping enabled
-    Some(rules) -> {
-      // Check quantity per transaction
-      let within_tx_limit = redeemer.quantity <= rules.max_per_transaction
-      // Additional checks (cooldown, wallet limit) would require
-      // reference inputs to historical purchase state
-      // For MVP, we only enforce per-transaction limit
-      within_tx_limit
-    }
-  }
-}
-
-/// 4. Whitelist Validation (Optional Feature - Presales)
-/// Only allows purchases from approved addresses
-fn validate_whitelist(datum: SaleDatum, tx: Transaction) -> Bool {
-  when datum.whitelist is {
-    // No whitelist - public sale
-    None -> True
-    // Whitelist enabled - check buyer
-    Some(whitelist) -> {
-      // Get buyer's PKH from extra_signatories
-      // The buyer must sign the transaction
-      list.any(
-        tx.extra_signatories,
-        fn(pkh: VerificationKeyHash) {
-          list.has(whitelist.approved_addresses, pkh)
-        },
-      )
-    }
-  }
-}
-
-/// 5. Pricing Validation (Always On)
-/// Ensures correct price is paid based on strategy
-fn validate_pricing(datum: SaleDatum, redeemer: SaleRedeemer) -> Bool {
-  when datum.pricing_strategy is {
-    // Fixed price - check against datum
-    FixedPrice { price } -> {
-      let expected_payment = price * redeemer.quantity
-      redeemer.payment_amount >= expected_payment
-    }
-  }
-}
-
-/// 6. Payment Validation (MVP - Always On)
-/// Ensures correct payment is sent to organizer
-fn validate_payment(
-  datum: SaleDatum,
-  redeemer: SaleRedeemer,
-  tx: Transaction,
-  settings: GlobalSettings,
-) -> Bool {
-  // Find payment to organizer
-  expect Some(organizer_output) =
-    list.find(
-      tx.outputs,
-      fn(output: Output) { output.address == datum.organizer_address },
-    )
-
-  // Calculate expected payment
-  let gross_payment = redeemer.payment_amount
-  let platform_fee = ( gross_payment * settings.platform_fee_bps ) / 10000
-  let net_to_organizer = gross_payment - platform_fee
-
-  // Verify organizer receives correct amount
-  let lovelace_received = assets.lovelace_of(organizer_output.value)
-
-  lovelace_received >= net_to_organizer
-}
-
-/// 7. NFT Minting Validation (Always On)
-/// Ensures ticket NFTs are actually minted
-fn validate_nft_minting(
-  datum: SaleDatum,
-  redeemer: SaleRedeemer,
-  tx: Transaction,
-) -> Bool {
-  // Check if the correct number of NFTs are minted
-  let minted_tokens = assets.tokens(tx.mint, datum.event_policy)
-
-  // Count total minted (should equal purchase quantity)
-  let total_minted =
-    dict.foldl(
-      minted_tokens,
-      0,
-      fn(_name, qty, acc) { acc + qty },
-    )
-
-  total_minted == redeemer.quantity
 }
 
 // ============================================
@@ -237,7 +116,7 @@ fn mock_address(pkh: ByteArray) -> Address {
 
 fn mock_settings_input(
   settings_policy: PolicyId,
-  is_active: Bool,
+  is_active: MarketStatus,
   fee_bps: Int,
 ) -> Input {
   let treasury_address = mock_address(#"1111111111111111111111111111111111111111111111111111111111")
@@ -258,9 +137,7 @@ fn mock_settings_input(
       output_index: 0,
     },
     output: Output {
-      address: mock_address(
-        #"0000000000000000000000000000000000000000000000000000000000",
-      ),
+      address: mock_address(#"0000000000000000000000000000000000000000000000000000000000"),
       value: from_asset(settings_policy, "Settings", 1),
       datum: InlineDatum(settings_datum),
       reference_script: None,
@@ -273,15 +150,11 @@ fn mock_sale_datum(organizer_pkh: ByteArray, price: Int) -> SaleDatum {
     organizer_address: mock_address(organizer_pkh),
     base_price: price,
     event_policy: #"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-    sale_window: None,
-    anti_scalping_rules: None,
-    whitelist: None,
-    pricing_strategy: FixedPrice { price: price },
   }
 }
 
 // ============================================
-// FUZZ TESTS
+// UNIT TESTS
 // ============================================
 
 test basic_purchase_succeeds() {
@@ -297,14 +170,18 @@ test basic_purchase_succeeds() {
   let redeemer_data: Data =
     SaleRedeemer {
       quantity: quantity,
-      payment_amount: price * quantity,
       buyer_pkh: buyer_pkh,
     }
+
+  // Calculate expected payment: (price * quantity) - platform fee
+  let total_payment = price * quantity
+  let platform_fee = (total_payment * 250) / 10000
+  let net_to_organizer = total_payment - platform_fee
 
   let organizer_output =
     Output {
       address: mock_address(organizer_pkh),
-      value: from_lovelace(price * quantity - ( price * quantity * 250 ) / 10000),
+      value: from_lovelace(net_to_organizer),
       datum: InlineDatum(Void),
       reference_script: None,
     }
@@ -313,7 +190,7 @@ test basic_purchase_succeeds() {
     Transaction {
       ..placeholder,
       extra_signatories: [buyer_pkh],
-      reference_inputs: [mock_settings_input(settings_policy, True, 250)],
+      reference_inputs: [mock_settings_input(settings_policy, Active, 250)],
       outputs: [organizer_output],
       mint: from_asset(event_policy, #"4576656e742d303031", quantity),
     }
@@ -340,13 +217,13 @@ test purchase_fails_when_market_closed() {
   let sale_datum = mock_sale_datum(organizer_pkh, price)
   let datum_data: Data = sale_datum
   let redeemer_data: Data =
-    SaleRedeemer { quantity: 1, payment_amount: price, buyer_pkh: buyer_pkh }
+    SaleRedeemer { quantity: 1, buyer_pkh: buyer_pkh }
 
   let tx =
     Transaction {
       ..placeholder,
       extra_signatories: [buyer_pkh],
-      reference_inputs: [mock_settings_input(settings_policy, False, 250)],
+      reference_inputs: [mock_settings_input(settings_policy, Inactive, 250)],
       outputs: [],
       mint: from_asset(event_policy, #"4576656e742d303031", 1),
     }
@@ -373,7 +250,7 @@ test purchase_fails_without_buyer_signature() {
   let sale_datum = mock_sale_datum(organizer_pkh, price)
   let datum_data: Data = sale_datum
   let redeemer_data: Data =
-    SaleRedeemer { quantity: 1, payment_amount: price, buyer_pkh: buyer_pkh }
+    SaleRedeemer { quantity: 1, buyer_pkh: buyer_pkh }
 
   // Calculate expected organizer payment (price - platform fee)
   let platform_fee = price * 250 / 10000
@@ -390,109 +267,9 @@ test purchase_fails_without_buyer_signature() {
   let tx =
     Transaction {
       ..placeholder,
-      extra_signatories: [],
-      // Buyer hasn't signed!
-      reference_inputs: [mock_settings_input(settings_policy, True, 250)],
+      extra_signatories: [],  // Buyer hasn't signed!
+      reference_inputs: [mock_settings_input(settings_policy, Active, 250)],
       outputs: [organizer_output],
-      mint: from_asset(event_policy, #"4576656e742d303031", 1),
-    }
-
-  !primary_sale.spend(
-    settings_policy,
-    Some(datum_data),
-    redeemer_data,
-    OutputReference {
-      transaction_id: #"1111111111111111111111111111111111111111111111111111111111111111",
-      output_index: 0,
-    },
-    tx,
-  )
-}
-
-test anti_scalping_limits_quantity() {
-  let organizer_pkh = #"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-  let buyer_pkh = #"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-  let settings_policy = #"5555555555555555555555555555555555555555555555555555"
-  let event_policy = #"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-
-  let price = 10_000_000
-  let sale_datum =
-    SaleDatum {
-      organizer_address: mock_address(organizer_pkh),
-      base_price: price,
-      event_policy: event_policy,
-      sale_window: None,
-      anti_scalping_rules: Some(
-        AntiScalpingRules {
-          max_per_transaction: 4,
-          max_per_wallet: 10,
-          cooldown_period: 3600,
-        },
-      ),
-      whitelist: None,
-      pricing_strategy: FixedPrice { price: price },
-    }
-  let datum_data: Data = sale_datum
-
-  // Try to buy 5 tickets (exceeds max of 4)
-  let redeemer_data: Data =
-    SaleRedeemer {
-      quantity: 5,
-      payment_amount: price * 5,
-      buyer_pkh: buyer_pkh,
-    }
-
-  let tx =
-    Transaction {
-      ..placeholder,
-      extra_signatories: [buyer_pkh],
-      reference_inputs: [mock_settings_input(settings_policy, True, 250)],
-      outputs: [],
-      mint: from_asset(event_policy, #"4576656e742d303031", 5),
-    }
-
-  !primary_sale.spend(
-    settings_policy,
-    Some(datum_data),
-    redeemer_data,
-    OutputReference {
-      transaction_id: #"1111111111111111111111111111111111111111111111111111111111111111",
-      output_index: 0,
-    },
-    tx,
-  )
-}
-
-test whitelist_blocks_non_approved() {
-  let organizer_pkh = #"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-  let buyer_pkh = #"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-  let whitelisted_pkh = #"4444444444444444444444444444444444444444444444444444444444"
-  let settings_policy = #"5555555555555555555555555555555555555555555555555555"
-  let event_policy = #"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-
-  let price = 10_000_000
-  let sale_datum =
-    SaleDatum {
-      organizer_address: mock_address(organizer_pkh),
-      base_price: price,
-      event_policy: event_policy,
-      sale_window: None,
-      anti_scalping_rules: None,
-      whitelist: Some(Whitelist { approved_addresses: [whitelisted_pkh] }),
-      pricing_strategy: FixedPrice { price: price },
-    }
-  let datum_data: Data = sale_datum
-
-  // Non-whitelisted buyer tries to purchase
-  let redeemer_data: Data =
-    SaleRedeemer { quantity: 1, payment_amount: price, buyer_pkh: buyer_pkh }
-
-  let tx =
-    Transaction {
-      ..placeholder,
-      extra_signatories: [buyer_pkh],
-      reference_inputs: [mock_settings_input(settings_policy, True, 250)],
-      outputs: [],
       mint: from_asset(event_policy, #"4576656e742d303031", 1),
     }
 
@@ -517,15 +294,10 @@ test purchase_fails_insufficient_payment() {
   let price = 10_000_000
   let sale_datum = mock_sale_datum(organizer_pkh, price)
   let datum_data: Data = sale_datum
-
-  // Buyer only pays half the required amount
   let redeemer_data: Data =
-    SaleRedeemer {
-      quantity: 1,
-      payment_amount: price / 2,
-      buyer_pkh: buyer_pkh,
-    }
+    SaleRedeemer { quantity: 1, buyer_pkh: buyer_pkh }
 
+  // Pay only half the required amount
   let organizer_output =
     Output {
       address: mock_address(organizer_pkh),
@@ -538,7 +310,7 @@ test purchase_fails_insufficient_payment() {
     Transaction {
       ..placeholder,
       extra_signatories: [buyer_pkh],
-      reference_inputs: [mock_settings_input(settings_policy, True, 250)],
+      reference_inputs: [mock_settings_input(settings_policy, Active, 250)],
       outputs: [organizer_output],
       mint: from_asset(event_policy, #"4576656e742d303031", 1),
     }

@@ -9,7 +9,7 @@ use cardano/transaction.{
   placeholder,
 }
 // Import shared types to ensure consistency across validators
-use types.{GlobalSettings, MintAction, Mint, Burn}
+use types.{GlobalSettings, MintAction, Mint, Burn, MarketStatus, Active, Inactive}
 
 /// Event Minting Policy
 /// 
@@ -88,7 +88,7 @@ validator seatmint_event(
         let has_mint = total_minted > 0
 
         // Platform must be active
-        let market_open = settings.is_market_active
+        let market_open = settings.is_market_active == Active
 
         // Respect platform supply limits
         let within_supply_limit = total_minted <= settings.current_max_supply
@@ -136,7 +136,7 @@ fn mock_script_address(script_hash: ByteArray) -> Address {
 
 fn mock_settings_input(
   settings_policy: PolicyId,
-  is_active: Bool,
+  is_active: MarketStatus,
   max_supply: Int,
 ) -> Input {
   let treasury_address = mock_address(#"1111111111111111111111111111111111111111111111111111111111")
@@ -179,7 +179,7 @@ test mint_requires_authorization() {
     Transaction {
       ..placeholder,
       extra_signatories: [],
-      reference_inputs: [mock_settings_input(settings_policy, True, 100)],
+      reference_inputs: [mock_settings_input(settings_policy, Active, 100)],
       inputs: [],
       mint: assets.from_asset(settings_policy, #"4576656e742d303031", 1),
     }
@@ -205,7 +205,7 @@ test mint_with_organizer_succeeds() {
     Transaction {
       ..placeholder,
       extra_signatories: [organizer_pkh],
-      reference_inputs: [mock_settings_input(settings_policy, True, 100)],
+      reference_inputs: [mock_settings_input(settings_policy, Active, 100)],
       inputs: [],
       mint: assets.from_asset(settings_policy, #"4576656e742d303031", 1),
     }
@@ -244,7 +244,7 @@ test mint_with_box_office_succeeds() {
     Transaction {
       ..placeholder,
       extra_signatories: [],
-      reference_inputs: [mock_settings_input(settings_policy, True, 100)],
+      reference_inputs: [mock_settings_input(settings_policy, Active, 100)],
       inputs: [box_office_input],
       mint: assets.from_asset(settings_policy, #"4576656e742d303031", 1),
     }
@@ -269,7 +269,7 @@ test burn_requires_organizer() {
     Transaction {
       ..placeholder,
       extra_signatories: [],
-      reference_inputs: [mock_settings_input(settings_policy, True, 100)],
+      reference_inputs: [mock_settings_input(settings_policy, Active, 100)],
       inputs: [],
       mint: assets.from_asset(settings_policy, #"4576656e742d303031", -1),
     }
@@ -295,7 +295,7 @@ test mint_fails_when_market_closed() {
     Transaction {
       ..placeholder,
       extra_signatories: [organizer_pkh],
-      reference_inputs: [mock_settings_input(settings_policy, False, 100)],
+      reference_inputs: [mock_settings_input(settings_policy, Inactive, 100)],
       inputs: [],
       mint: assets.from_asset(settings_policy, #"4576656e742d303031", 1),
     }
@@ -321,7 +321,7 @@ test mint_fails_exceeding_supply() {
     Transaction {
       ..placeholder,
       extra_signatories: [organizer_pkh],
-      reference_inputs: [mock_settings_input(settings_policy, True, 0)],
+      reference_inputs: [mock_settings_input(settings_policy, Active, 0)],
       inputs: [],
       mint: assets.from_asset(settings_policy, #"4576656e742d303031", 1),
     }
@@ -347,7 +347,7 @@ test mint_fails_invalid_token_name() {
     Transaction {
       ..placeholder,
       extra_signatories: [organizer_pkh],
-      reference_inputs: [mock_settings_input(settings_policy, True, 100)],
+      reference_inputs: [mock_settings_input(settings_policy, Active, 100)],
       inputs: [],
       // Invalid prefix: "Ticket-" instead of "Event-"
       mint: assets.from_asset(settings_policy, #"5469636b65742d303031", 1),

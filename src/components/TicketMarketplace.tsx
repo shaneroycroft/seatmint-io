@@ -77,25 +77,52 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
 
   const loadData = async () => {
     setLoading(true);
+    console.log('TicketMarketplace: Loading data for address:', userAddress);
+
     try {
-      const { data: listingsData } = await supabase
+      const { data: listingsData, error: listingsError } = await supabase
         .from('tickets')
         .select(`
           *,
-          events (event_name, event_date, venue_name),
+          events (event_name, event_date, venue_name, event_policy_id),
           ticket_tiers (tier_name, price_lovelace)
         `)
         .eq('status', 'listed')
         .neq('current_owner_address', userAddress);
 
-      const { data: myTicketsData } = await supabase
+      if (listingsError) {
+        console.error('Listings query failed:', listingsError);
+      }
+
+      const { data: myTicketsData, error: myTicketsError } = await supabase
         .from('tickets')
         .select(`
           *,
-          events (event_name, event_date, venue_name),
+          events (event_name, event_date, venue_name, event_policy_id),
           ticket_tiers (tier_name, price_lovelace)
         `)
         .eq('current_owner_address', userAddress);
+
+      if (myTicketsError) {
+        console.error('My tickets query failed:', myTicketsError);
+      }
+
+      console.log('TicketMarketplace: Found', listingsData?.length || 0, 'listings');
+      console.log('TicketMarketplace: Found', myTicketsData?.length || 0, 'owned tickets');
+
+      // Debug: If no owned tickets, check if any tickets exist at all
+      if (!myTicketsData || myTicketsData.length === 0) {
+        const { data: allTickets } = await supabase
+          .from('tickets')
+          .select('id, current_owner_address, status')
+          .limit(10);
+
+        console.log('TicketMarketplace DEBUG: Sample tickets in database:');
+        allTickets?.forEach(t => {
+          console.log(`  Ticket ${t.id}: owner=${t.current_owner_address?.slice(0,30)}... status=${t.status}`);
+          console.log(`    Address match: ${t.current_owner_address === userAddress}`);
+        });
+      }
 
       setListings(formatTickets(listingsData || []));
       setMyTickets(formatTickets(myTicketsData || []));

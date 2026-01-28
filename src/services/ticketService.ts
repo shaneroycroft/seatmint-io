@@ -66,34 +66,51 @@ const AddressSchema = Data.Object({
   stake_credential: Data.Nullable(CredentialSchema),
 });
 
+// MarketStatus enum schema - matches Aiken's MarketStatus { Inactive, Active }
+// Inactive = Constr(0, []) = d87980
+// Active = Constr(1, []) = d87a80
+const MarketStatusSchema = Data.Enum([
+  Data.Literal("Inactive"),
+  Data.Literal("Active"),
+]);
+
 // GlobalSettings datum schema
 const GlobalSettingsSchema = Data.Object({
   platform_fee_bps: Data.Integer(),
   platform_treasury: AddressSchema,
-  is_market_active: Data.Boolean(),
+  is_market_active: MarketStatusSchema,
   current_max_supply: Data.Integer(),
   max_resale_multiplier: Data.Integer(),
   admin_pkh: Data.Bytes(),
 });
+// GlobalSettings type (for schema reference when decoding from chain)
 
-// SaleDatum schema reference (built as Constr directly):
-// Fields: organizer_address (Bytes), base_price (Integer), event_policy (Bytes),
-//         sale_window (Option), anti_scalping_rules (Option), whitelist (Option), pricing_strategy (Enum)
+// SaleDatum schema - simplified for MVP
+// Matches Aiken: pub type SaleDatum { organizer_address, base_price, event_policy }
+const SaleDatumSchema = Data.Object({
+  organizer_address: AddressSchema,
+  base_price: Data.Integer(),
+  event_policy: Data.Bytes(),
+});
+type SaleDatum = Data.Static<typeof SaleDatumSchema>;
+void (0 as unknown as SaleDatum); // Schema reserved for future typed decoding
 
-// SaleRedeemer schema
+// SaleRedeemer schema - simplified (payment calculated from base_price * quantity)
+// Matches Aiken: pub type SaleRedeemer { quantity, buyer_pkh }
 const SaleRedeemerSchema = Data.Object({
   quantity: Data.Integer(),
-  payment_amount: Data.Integer(),
   buyer_pkh: Data.Bytes(),
 });
 type SaleRedeemer = Data.Static<typeof SaleRedeemerSchema>;
+void (0 as unknown as SaleRedeemer); // Schema reserved for future typed decoding
 
-// MintAction schema (kept for reference - using Constr directly)
-const _MintActionSchema = Data.Enum([
+// MintAction enum - matches Aiken: pub type MintAction { Mint, Burn }
+const MintActionSchema = Data.Enum([
   Data.Literal("Mint"),
   Data.Literal("Burn"),
 ]);
-void _MintActionSchema;
+type MintAction = Data.Static<typeof MintActionSchema>;
+void (0 as unknown as MintAction); // Schema reserved for future typed decoding
 
 // TicketDatum schema (secondary market listings)
 // Note: artist and seller are Address types in Aiken
@@ -116,10 +133,12 @@ type TicketDatum = Data.Static<typeof TicketDatumSchema>;
 
 /**
  * Convert Date to POSIX time (milliseconds as bigint)
+ * Reserved for future time-based features (sale windows, etc.)
  */
-function dateToPosixTime(date: Date): bigint {
+function _dateToPosixTime(date: Date): bigint {
   return BigInt(date.getTime());
 }
+void _dateToPosixTime; // Reserved for future time-based features
 
 /**
  * Convert ADA amount to Lovelace (bigint)
@@ -145,6 +164,45 @@ function addressToPkh(address: string): string {
     throw new Error('Invalid address: no key-based payment credential');
   }
   return details.paymentCredential.hash;
+}
+
+/**
+ * Encode GlobalSettings datum
+ *
+ * Uses MarketStatus enum (Constr-based) instead of primitive Bool:
+ *   - Active = Constr(1, []) = d87a80
+ *   - Inactive = Constr(0, []) = d87980
+ *
+ * This matches Aiken's MarketStatus type and is compatible with Lucid Evolution.
+ */
+function encodeGlobalSettingsDatum(
+  platformFeeBps: bigint,
+  treasuryPkh: string,
+  isMarketActive: boolean,
+  currentMaxSupply: bigint,
+  maxResaleMultiplier: bigint,
+  adminPkh: string
+): string {
+  const treasuryAddress = pkhToAikenAddress(treasuryPkh);
+
+  // MarketStatus enum: Active = Constr(1, []), Inactive = Constr(0, [])
+  // This matches the Aiken type and is Lucid-compatible
+  const marketStatus = new Constr(isMarketActive ? 1 : 0, []);
+
+  const datumConstr = new Constr(0, [
+    platformFeeBps,
+    treasuryAddress,
+    marketStatus,
+    currentMaxSupply,
+    maxResaleMultiplier,
+    adminPkh,
+  ]);
+
+  const cbor = Data.to(datumConstr as Data);
+  console.log('GlobalSettings CBOR:', cbor);
+  console.log('  MarketStatus:', isMarketActive ? 'Active (d87a80)' : 'Inactive (d87980)');
+
+  return cbor;
 }
 
 /**
@@ -300,61 +358,18 @@ export async function createEvent(
 
   console.log('Policy ID:', policyId);
 
-  // Step 6: Build primary sale datum for first tier using Constr
+  // Step 6: Build primary sale datum for first tier
+  // Simplified SaleDatum: { organizer_address, base_price, event_policy }
   const firstTier = params.ticketTiers[0];
   const basePriceLovelace = adaToLovelace(firstTier.priceAda);
 
-  // Helper: Build Option type - Some(value) = Constr(0, [value]), None = Constr(1, [])
-  const buildOption = (value: unknown) =>
-    value !== null ? new Constr(0, [value]) : new Constr(1, []);
-
-  // Build sale window: Option<SaleWindow>
-  const saleWindowConstr = (params.saleStartDate && params.saleEndDate)
-    ? buildOption(new Constr(0, [
-        dateToPosixTime(params.saleStartDate),
-        dateToPosixTime(params.saleEndDate),
-      ]))
-    : buildOption(null);
-
-  // Build anti-scalping rules: Option<AntiScalpingRules>
-  const antiScalpingConstr = firstTier.maxPerWallet > 0
-    ? buildOption(new Constr(0, [
-        BigInt(firstTier.maxPerWallet),
-        BigInt(firstTier.maxPerWallet * 2),
-        0n,
-      ]))
-    : buildOption(null);
-
-  // Build whitelist: Option<Whitelist>
-  const whitelistConstr = (params.whitelistAddresses && params.whitelistAddresses.length > 0)
-    ? buildOption(new Constr(0, [
-        params.whitelistAddresses.map(addr => addressToPkh(addr)),
-      ]))
-    : buildOption(null);
-
-  // Build pricing strategy: Enum (FixedPrice=0)
-  // PricingStrategy::FixedPrice { price } = Constr(0, [price])
-  let pricingStrategyConstr: Constr<unknown>;
-  if (firstTier.earlyBirdPriceAda && firstTier.earlyBirdDeadline) {
-    // EarlyBird would be Constr(1, [early_price, deadline]) if implemented
-    // For now, fall back to FixedPrice
-    pricingStrategyConstr = new Constr(0, [basePriceLovelace]);
-  } else {
-    // FixedPrice { price } = Constr(0, [price])
-    pricingStrategyConstr = new Constr(0, [basePriceLovelace]);
-  }
-
-  // Build SaleDatum: Constr(0, [organizer_address, base_price, event_policy, sale_window, anti_scalping, whitelist, pricing])
-  // organizer_address must be a full Aiken Address structure, not just a PKH
+  // Build SaleDatum as Constr (Aiken record = Constr(0, [fields...]))
+  // organizer_address must be a full Aiken Address structure
   const organizerAddressConstr = pkhToAikenAddress(organizerPKH);
   const saleDatumConstr = new Constr(0, [
     organizerAddressConstr,
     basePriceLovelace,
     policyId,
-    saleWindowConstr,
-    antiScalpingConstr,
-    whitelistConstr,
-    pricingStrategyConstr,
   ]);
 
   // Step 8: Build transaction to create sale UTxO
@@ -397,7 +412,10 @@ export interface PurchaseTicketParams {
 }
 
 /**
- * Purchase Tickets (Primary Sale)
+ * Purchase Tickets (Primary Sale) - Simplified
+ *
+ * Uses schema-based serialization and minimal validation.
+ * Trust the validator for business logic.
  */
 export async function purchaseTickets(
   lucid: LucidEvolution,
@@ -406,92 +424,132 @@ export async function purchaseTickets(
 
   console.log('Purchasing tickets:', params);
 
-  // Step 1: Get event and tier info
+  // Step 1: Get event and tier info from database
   const { data: tier, error: tierError } = await supabase
     .from('ticket_tiers')
     .select('*, events(*)')
     .eq('id', params.tierId)
     .single();
 
-  if (tierError || !tier) {
-    throw new Error('Ticket tier not found');
-  }
+  if (tierError || !tier) throw new Error('Ticket tier not found');
+  if (tier.remaining_supply < params.quantity) throw new Error('Not enough tickets available');
 
-  if (tier.remaining_supply < params.quantity) {
-    throw new Error('Not enough tickets available');
-  }
-
-  // Step 2: Get buyer address
+  // Step 2: Get addresses and keys
   const buyerAddress = await lucid.wallet().address();
   const buyerPKH = paymentCredentialOf(buyerAddress).hash;
-
-  // Step 3: Validate validators and get settings
-  if (!EVENT_MINT_VALIDATOR || !PRIMARY_SALE_VALIDATOR) {
-    throw new Error('Validators not found in plutus.json. Run `aiken build` first.');
-  }
-  const { utxo: settingsUTxO, settingsPolicyId } = await getSettingsUTxO(lucid);
-  const settings = Data.from(settingsUTxO.datum!, GlobalSettingsSchema);
-
-  // Step 4: Apply parameters to validators (using settings policy ID)
-  const primarySaleValidator = applyPrimarySaleParams(settingsPolicyId);
-
-  // Step 5: Find sale UTxO (box office) for this specific event
+  const organizerPKH = paymentCredentialOf(tier.events.organizer_wallet_address).hash;
   const network = lucid.config().network;
   if (!network) throw new Error('Network not configured');
-  const saleAddress = validatorToAddress(network, primarySaleValidator);
-  const saleUTxOs = await lucid.utxosAt(saleAddress);
 
-  if (saleUTxOs.length === 0) {
-    throw new Error('Sale UTxO not found');
+  // Step 3: Get platform settings
+  if (!EVENT_MINT_VALIDATOR || !PRIMARY_SALE_VALIDATOR) {
+    throw new Error('Validators not found. Run `aiken build` first.');
+  }
+  const { utxo: settingsUTxO, settingsPolicyId } = await getSettingsUTxO(lucid);
+
+  // Debug: Verify Settings UTxO content
+  console.log('DEBUG Settings UTxO:');
+  console.log('  Policy ID:', settingsPolicyId);
+  console.log('  UTxO:', settingsUTxO.txHash + '#' + settingsUTxO.outputIndex);
+  console.log('  Address:', settingsUTxO.address);
+  console.log('  Has Datum:', !!settingsUTxO.datum);
+  console.log('  Assets:', JSON.stringify(settingsUTxO.assets, (_, v) => typeof v === 'bigint' ? v.toString() : v));
+
+  // Check if Settings NFT is present
+  const settingsTokenUnit = toUnit(settingsPolicyId, fromText('Settings'));
+  const hasSettingsToken = settingsUTxO.assets[settingsTokenUnit] === 1n;
+  console.log('  Settings Token Unit:', settingsTokenUnit);
+  console.log('  Has Settings Token:', hasSettingsToken);
+
+  if (!hasSettingsToken) {
+    throw new Error(`Settings UTxO is missing the Settings NFT token! Expected unit: ${settingsTokenUnit}`);
   }
 
-  // Find the sale UTxO that matches this event's policy ID
-  // The SaleDatum contains event_policy which should match tier.events.event_policy_id
-  const eventPolicyId = tier.events.event_policy_id;
-  const saleUTxO = saleUTxOs.find(utxo => {
-    if (!utxo.datum) return false;
-    try {
-      // Decode the datum to check the event_policy field
-      // SaleDatum structure: Constr(0, [organizer_address, base_price, event_policy, ...])
-      const decoded = Data.from(utxo.datum);
-      if (decoded instanceof Constr && decoded.fields.length >= 3) {
-        const datumEventPolicy = decoded.fields[2] as string;
-        return datumEventPolicy === eventPolicyId;
-      }
-      return false;
-    } catch {
-      return false;
+  const settings = Data.from(settingsUTxO.datum!, GlobalSettingsSchema);
+
+  // Step 4: Build validators with parameters
+  const primarySaleValidator = applyPrimarySaleParams(settingsPolicyId);
+  const boxOfficeHash = validatorToScriptHash(primarySaleValidator);
+  const mintingPolicyValidator = applyEventMintParams(organizerPKH, settingsPolicyId, boxOfficeHash);
+  const saleAddress = validatorToAddress(network, primarySaleValidator);
+
+  // Verify policy ID matches database (catches parameter mismatches)
+  const derivedPolicyId = mintingPolicyToId(mintingPolicyValidator);
+  if (derivedPolicyId !== tier.events.event_policy_id) {
+    throw new Error(`Policy ID mismatch. Event may need to be recreated.`);
+  }
+
+  // Step 5: Find the sale UTxO for this event
+  const saleUTxOs = await lucid.utxosAt(saleAddress);
+  console.log('Sale UTxOs at address:', saleUTxOs.length);
+  saleUTxOs.forEach((u, i) => {
+    console.log(`  [${i}] ${u.txHash}#${u.outputIndex} | datum: ${!!u.datum}`);
+    if (u.datum) {
+      try {
+        const d = Data.from(u.datum);
+        if (d instanceof Constr) {
+          console.log(`      Fields: ${d.fields.length}, Policy: ${d.fields[2]}`);
+        }
+      } catch (e) { console.log('      (failed to decode datum)'); }
     }
   });
 
+  const saleUTxO = saleUTxOs.find(utxo => {
+    if (!utxo.datum) return false;
+    try {
+      const decoded = Data.from(utxo.datum);
+      if (decoded instanceof Constr && decoded.fields.length >= 3) {
+        const eventPolicy = decoded.fields[2];
+        return eventPolicy === tier.events.event_policy_id;
+      }
+      return false;
+    } catch { return false; }
+  });
+
   if (!saleUTxO) {
-    throw new Error(`Sale UTxO not found for event policy ${eventPolicyId}`);
+    throw new Error(`Sale UTxO not found for this event. Expected policy: ${tier.events.event_policy_id}`);
   }
+  console.log('Selected sale UTxO:', saleUTxO.txHash + '#' + saleUTxO.outputIndex);
 
-  // Step 5: Generate ticket token names
-  const ticketNames = await generateTicketNames(
-    tier.events.event_policy_id,
-    params.quantity
-  );
-
-  // Step 6: Calculate payments (ADA -> Lovelace conversion)
+  // Step 6: Generate ticket names and calculate payments
+  const ticketNames = await generateTicketNames(tier.events.event_policy_id, params.quantity);
   const pricePerTicket = BigInt(tier.price_lovelace);
   const totalPrice = pricePerTicket * BigInt(params.quantity);
   const platformFee = (totalPrice * BigInt(settings.platform_fee_bps)) / 10000n;
   const organizerPayment = totalPrice - platformFee;
 
-  // Step 7: Build redeemer for primary sale
-  const saleRedeemer: SaleRedeemer = {
-    quantity: BigInt(params.quantity),
-    payment_amount: totalPrice,
-    buyer_pkh: buyerPKH,
-  };
-
-  // Step 8: Build minting assets
+  // Step 7: Build mint assets
   const mintAssets: Record<string, bigint> = {};
   ticketNames.forEach(name => {
     mintAssets[toUnit(tier.events.event_policy_id, name)] = 1n;
   });
+
+  // Step 8: Build redeemers
+  // SaleRedeemer is a record in Aiken = Constr(0, [quantity, buyer_pkh])
+  const saleRedeemerConstr = new Constr(0, [
+    BigInt(params.quantity),
+    buyerPKH,
+  ]);
+  const saleRedeemerCbor = Data.to(saleRedeemerConstr);
+
+  // ATOMIC DECODE TEST: Verify redeemer can round-trip before submit
+  try {
+    const decoded = Data.from(saleRedeemerCbor);
+    if (!(decoded instanceof Constr) || decoded.fields.length !== 2) {
+      throw new Error('Redeemer structure invalid');
+    }
+  } catch (e) {
+    throw new Error(`Redeemer encoding failed round-trip test: ${e}`);
+  }
+
+  // MintAction::Mint = Constr(0, []) in Aiken
+  const mintRedeemerConstr = new Constr(0, []);
+  const mintRedeemerCbor = Data.to(mintRedeemerConstr);
+
+  // Step 9: Get payment addresses
+  const organizerPaymentAddress = pkhToAddress(organizerPKH, network);
+  const treasuryPkh = aikenAddressToPkh(settings.platform_treasury as DecodedAddress);
+  const treasuryAddress = pkhToAddress(treasuryPkh, network);
 
   // Step 10: Build metadata (CIP-25)
   const metadata = buildCIP25Metadata(
@@ -501,71 +559,114 @@ export async function purchaseTickets(
     ticketNames
   );
 
-  // Step 11: Get organizer PKH for minting policy
-  const organizerPKH = paymentCredentialOf(tier.events.organizer_wallet_address).hash;
-  const boxOfficeHash = validatorToScriptHash(primarySaleValidator);
+  console.log('Building transaction...');
+  console.log('  Quantity:', params.quantity);
+  console.log('  Organizer payment:', organizerPayment.toString(), 'lovelace');
+  console.log('  Platform fee:', platformFee.toString(), 'lovelace');
 
-  // Step 12: Apply parameters to event mint policy
-  const mintingPolicyValidator = applyEventMintParams(
-    organizerPKH,
-    settingsPolicyId,
-    boxOfficeHash
-  );
+  // Debug: Log key addresses and UTxOs
+  console.log('DEBUG Transaction Inputs:');
+  console.log('  Sale UTxO:', saleUTxO.txHash + '#' + saleUTxO.outputIndex);
+  console.log('  Sale Address:', saleUTxO.address);
+  console.log('  Settings UTxO:', settingsUTxO.txHash + '#' + settingsUTxO.outputIndex);
+  console.log('  Settings Address:', settingsUTxO.address);
+  console.log('  Organizer Address (datum):', organizerPaymentAddress);
+  console.log('  Buyer Address:', buyerAddress);
+  console.log('  Box Office Hash:', boxOfficeHash);
+  console.log('  Minting Policy ID:', derivedPolicyId);
 
-  // Step 13: Build transaction
-  // Redeemer: Constr with index 0 for primary sale purchase
-  const saleRedeemerData = new Constr(0, [
-    saleRedeemer.quantity,
-    saleRedeemer.payment_amount,
-    saleRedeemer.buyer_pkh,
-  ]);
-  // Mint redeemer: Constr 0 for Mint
-  const mintRedeemerData = new Constr(0, []);
+  // Step 11: Get wallet UTxOs and filter to avoid script inputs
+  // Exclude UTxOs with datums (could be at script addresses) and the settings UTxO
+  const walletUtxos = await lucid.wallet().getUtxos();
+  console.log('  Wallet UTxOs total:', walletUtxos.length);
+  walletUtxos.forEach((u: UTxO, i: number) => {
+    console.log(`    [${i}] ${u.txHash}#${u.outputIndex} | ${u.address.slice(0,30)}... | datum: ${!!u.datum} | lovelace: ${u.assets.lovelace}`);
+  });
 
-  // IMPORTANT: The organizer address in the SaleDatum was created using pkhToAikenAddress,
-  // which produces an Address with stake_credential: None. The validator does an exact
-  // address comparison, so we must pay to an address with the same structure (no stake).
-  // Use pkhToAddress to create an address from just the PKH, matching the datum.
-  const organizerPaymentAddress = pkhToAddress(organizerPKH, network);
+  const safeWalletUtxos = walletUtxos.filter((utxo: UTxO) => {
+    const isSettingsUtxo = utxo.txHash === settingsUTxO.txHash && utxo.outputIndex === settingsUTxO.outputIndex;
+    const hasDatum = !!utxo.datum;
+    return !isSettingsUtxo && !hasDatum;
+  });
+  console.log('  Safe Wallet UTxOs:', safeWalletUtxos.length);
 
-  const tx = await lucid
-    .newTx()
-    .collectFrom(
-      [saleUTxO],
-      Data.to(saleRedeemerData)
-    )
-    .readFrom([settingsUTxO])
-    .mintAssets(
-      mintAssets,
-      Data.to(mintRedeemerData)
-    )
-    .pay.ToAddress(organizerPaymentAddress, {
-      lovelace: organizerPayment
-    })
-    .pay.ToAddress(pkhToAddress(aikenAddressToPkh(settings.platform_treasury as DecodedAddress), network), {
-      lovelace: platformFee
-    })
-    .pay.ToAddressWithData(
-      saleAddress,
-      { kind: 'inline', value: saleUTxO.datum! },
-      { lovelace: 2_000_000n }
-    )
-    .attachMetadata(721, metadata)
-    .addSigner(buyerAddress)
-    .attach.MintingPolicy(mintingPolicyValidator)
-    .attach.SpendingValidator(primarySaleValidator)
-    .complete();
+  // Step 12: Build and submit transaction
+  try {
+    const tx = await lucid
+      .newTx()
+      .collectFrom([saleUTxO], saleRedeemerCbor)
+      .collectFrom(safeWalletUtxos) // Explicit coin selection
+      .readFrom([settingsUTxO])
+      .mintAssets(mintAssets, mintRedeemerCbor)
+      .pay.ToAddress(buyerAddress, { lovelace: 2_000_000n, ...mintAssets })
+      .pay.ToAddress(organizerPaymentAddress, { lovelace: organizerPayment })
+      .pay.ToAddress(treasuryAddress, { lovelace: platformFee })
+      .pay.ToAddressWithData(
+        saleAddress,
+        { kind: 'inline', value: saleUTxO.datum! },
+        { lovelace: 2_000_000n }
+      )
+      .attachMetadata(721, metadata)
+      .addSigner(buyerAddress)
+      .attach.MintingPolicy(mintingPolicyValidator)
+      .attach.SpendingValidator(primarySaleValidator)
+      .complete();
 
-  const signedTx = await tx.sign.withWallet().complete();
-  const txHash = await signedTx.submit();
+    const signedTx = await tx.sign.withWallet().complete();
+    const txHash = await signedTx.submit();
 
-  console.log('Transaction submitted:', txHash);
-  await lucid.awaitTx(txHash);
+    console.log('Transaction submitted:', txHash);
 
-  // Step 12: Update database
-  await recordTicketPurchase(params, ticketNames, txHash, buyerAddress);
+    // OPTIMISTIC UPDATE: Record to database immediately after submission
+    // This ensures we don't lose track of tickets if awaitTx has issues
+    try {
+      await recordTicketPurchase(params, ticketNames, txHash, buyerAddress);
+      console.log('Database updated (optimistic)');
+    } catch (dbError) {
+      console.error('Failed to record purchase to database:', dbError);
+      // Continue - the on-chain transaction may still succeed
+    }
 
-  return { txHash, ticketIds: ticketNames };
+    // Wait for confirmation (with timeout handling)
+    try {
+      await lucid.awaitTx(txHash);
+      console.log('Transaction confirmed on-chain');
+    } catch (awaitError) {
+      console.warn('awaitTx had issues, but transaction may have succeeded:', awaitError);
+      console.warn('TX Hash:', txHash);
+      console.warn('Check blockchain explorer to verify: https://preview.cardanoscan.io/transaction/' + txHash);
+      // Don't throw - the transaction might actually be on-chain
+    }
+
+    return { txHash, ticketIds: ticketNames };
+
+  } catch (e) {
+    // Provide helpful error context
+    console.error('Purchase transaction failed:', e);
+
+    // Quick diagnostic checks
+    const rawDatum = Data.from(saleUTxO.datum!);
+    const rawSettings = Data.from(settingsUTxO.datum!);
+
+    console.error('DEBUG Error Context:');
+    console.error('  Datum field count:', rawDatum instanceof Constr ? rawDatum.fields.length : 'not Constr');
+    console.error('  Settings field count:', rawSettings instanceof Constr ? rawSettings.fields.length : 'not Constr');
+    console.error('  Market status:', settings.is_market_active);
+    console.error('  Buyer PKH:', buyerPKH);
+    console.error('  Organizer PKH:', organizerPKH);
+    console.error('  Redeemer CBOR:', saleRedeemerCbor);
+    console.error('  Sale Address:', saleAddress);
+    console.error('  Sale UTxO Address:', saleUTxO.address);
+    console.error('  Do addresses match:', saleAddress === saleUTxO.address);
+
+    // Check if any wallet UTxO is at the sale address (would explain Spend[1])
+    const walletAtScript = walletUtxos.filter((u: UTxO) => u.address === saleAddress);
+    if (walletAtScript.length > 0) {
+      console.error('  WARNING: Wallet has UTxOs at script address!', walletAtScript.length);
+    }
+
+    throw e;
+  }
 }
 
 // ============================================
@@ -1062,6 +1163,12 @@ async function recordTicketPurchase(
   txHash: string,
   buyerAddress: string
 ) {
+  console.log('Recording ticket purchase to database...');
+  console.log('  Event ID:', params.eventId);
+  console.log('  Tier ID:', params.tierId);
+  console.log('  Buyer:', buyerAddress);
+  console.log('  Ticket names:', ticketNames);
+
   const tickets = ticketNames.map(name => ({
     event_id: params.eventId,
     tier_id: params.tierId,
@@ -1073,12 +1180,49 @@ async function recordTicketPurchase(
     status: 'minted',
   }));
 
-  await supabase.from('tickets').insert(tickets);
+  // Insert tickets with error handling
+  const { error: ticketsError } = await supabase.from('tickets').insert(tickets);
+  if (ticketsError) {
+    console.error('Failed to insert tickets:', ticketsError);
+    throw new Error(`Failed to record ticket purchase: ${ticketsError.message}`);
+  }
+  console.log('Tickets inserted successfully');
 
-  await supabase.rpc('decrement_tier_supply', {
+  // Try RPC function first, fall back to direct update if it doesn't exist
+  const { error: rpcError } = await supabase.rpc('decrement_tier_supply', {
     tier_id: params.tierId,
     amount: params.quantity,
   });
+
+  if (rpcError) {
+    console.warn('RPC decrement_tier_supply failed, using direct update:', rpcError.message);
+
+    // Fallback: Direct update to decrement remaining_supply
+    const { data: tier, error: fetchError } = await supabase
+      .from('ticket_tiers')
+      .select('remaining_supply')
+      .eq('id', params.tierId)
+      .single();
+
+    if (fetchError) {
+      console.error('Failed to fetch tier supply:', fetchError);
+      return; // Don't throw - ticket is already minted on-chain
+    }
+
+    const newSupply = (tier.remaining_supply || 0) - params.quantity;
+    const { error: updateError } = await supabase
+      .from('ticket_tiers')
+      .update({ remaining_supply: Math.max(0, newSupply) })
+      .eq('id', params.tierId);
+
+    if (updateError) {
+      console.error('Failed to update tier supply:', updateError);
+      return; // Don't throw - ticket is already minted on-chain
+    }
+    console.log('Tier supply decremented via fallback (new supply:', newSupply, ')');
+  } else {
+    console.log('Tier supply decremented via RPC');
+  }
 }
 
 // ============================================
@@ -1135,20 +1279,18 @@ export async function initializePlatformSettings(
   const settingsPolicyId = mintingPolicyToId(oneTimeMintScript);
   console.log('Settings Policy ID:', settingsPolicyId);
 
-  // Step 3: Build GlobalSettings datum using Constr
-  // Fields order (from types.ak): platform_fee_bps, platform_treasury, is_market_active, current_max_supply, max_resale_multiplier, admin_pkh
-  // platform_treasury is an Address type, not just bytes - use pkhToAikenAddress helper
-  // Boolean is represented as Constr(0, []) for False, Constr(1, []) for True in Plutus
-  const treasuryAddressConstr = pkhToAikenAddress(adminPKH);
-  const settingsDatumConstr = new Constr(0, [
-    platformFeeBps,                              // Integer
-    treasuryAddressConstr,                       // Address (not just bytes!)
-    new Constr(isMarketActive ? 1 : 0, []),      // Boolean as Constr
-    currentMaxSupply,                            // Integer
-    maxResaleMultiplier,                         // Integer
-    adminPKH,                                    // VerificationKeyHash (bytes)
-  ]);
-  const settingsDatum = Data.to(settingsDatumConstr as Data);
+  // Step 3: Build GlobalSettings datum with CBOR primitive boolean
+  // CRITICAL: Lucid Evolution's Data.Boolean() encodes as Constr (d87a80/d87980)
+  // but Aiken expects CBOR primitives (f5=true, f4=false).
+  // Use our custom encoder that fixes this.
+  const settingsDatum = encodeGlobalSettingsDatum(
+    platformFeeBps,
+    adminPKH,  // Treasury PKH (same as admin for now)
+    isMarketActive,
+    currentMaxSupply,
+    maxResaleMultiplier,
+    adminPKH
+  );
 
   // Step 4: Build and submit transaction
   const tx = await lucid
@@ -1170,10 +1312,29 @@ export async function initializePlatformSettings(
     .addSigner(adminAddress)
     .complete();
 
-  const signedTx = await tx.sign.withWallet().complete();
+  console.log('Transaction built. Requesting wallet signature...');
+  console.log('IMPORTANT: Please check for wallet popup and approve the transaction.');
+
+  let signedTx;
+  try {
+    signedTx = await tx.sign.withWallet().complete();
+  } catch (signError) {
+    const errorMessage = signError instanceof Error ? signError.message : String(signError);
+    console.error('Wallet signing failed:', errorMessage);
+    if (errorMessage.includes('TxSignError') || errorMessage.includes('user')) {
+      throw new Error(
+        'Wallet signature declined or popup not visible. ' +
+        'Please check: 1) Wallet popup was shown 2) You clicked "Approve" 3) Wallet is unlocked'
+      );
+    }
+    throw signError;
+  }
+
+  console.log('Transaction signed successfully. Submitting to network...');
   const txHash = await signedTx.submit();
 
   console.log('Settings TX submitted:', txHash);
+  console.log('Waiting for confirmation...');
   await lucid.awaitTx(txHash);
 
   // Step 5: Calculate UTxO reference
@@ -1234,7 +1395,7 @@ export async function getPlatformSettings(lucid: LucidEvolution): Promise<{
   return {
     platformFeeBps: Number(settings.platform_fee_bps),
     platformTreasury: aikenAddressToPkh(settings.platform_treasury as DecodedAddress),
-    isMarketActive: settings.is_market_active,
+    isMarketActive: settings.is_market_active === "Active",  // Convert MarketStatus enum to boolean
     currentMaxSupply: Number(settings.current_max_supply),
     maxResaleMultiplier: Number(settings.max_resale_multiplier),
     adminPkh: settings.admin_pkh,
@@ -1274,4 +1435,76 @@ export async function resetPlatformSettings(): Promise<void> {
   }
 
   console.log('Platform settings reset. Call initializePlatformSettings() to create new settings.');
+}
+
+/**
+ * Burn the existing Settings NFT
+ *
+ * This permanently destroys the Settings NFT on-chain. The admin must sign
+ * the transaction since the minting policy requires admin authorization.
+ *
+ * WARNING: All existing events created with this settings policy will become
+ * unusable after burning. Only burn if you intend to re-initialize immediately.
+ */
+export async function burnSettingsNft(lucid: LucidEvolution): Promise<string> {
+  // Step 1: Get current settings from database
+  const { data, error } = await supabase
+    .from('platform_config')
+    .select('settings_policy_id, settings_utxo_ref, admin_pkh')
+    .eq('id', 'main')
+    .single();
+
+  if (error || !data?.settings_policy_id) {
+    throw new Error('No settings NFT found to burn');
+  }
+
+  const settingsPolicyId = data.settings_policy_id;
+  const adminPkh = data.admin_pkh;
+
+  // Step 2: Find the settings UTxO on-chain
+  const { utxo: settingsUTxO } = await getSettingsUTxO(lucid);
+
+  // Step 3: Rebuild the native script (requires admin signature)
+  const mintScript = scriptFromNative({
+    type: 'sig',
+    keyHash: adminPkh
+  });
+
+  // Verify the script produces the same policy ID
+  const derivedPolicyId = mintingPolicyToId(mintScript);
+  if (derivedPolicyId !== settingsPolicyId) {
+    throw new Error(`Policy ID mismatch. Expected ${settingsPolicyId}, got ${derivedPolicyId}`);
+  }
+
+  // Step 4: Get admin address for returning the ADA
+  const adminAddress = await lucid.wallet().address();
+
+  // Step 5: Build burn transaction
+  const settingsUnit = toUnit(settingsPolicyId, fromText('Settings'));
+
+  console.log('Burning Settings NFT...');
+  console.log('  Policy ID:', settingsPolicyId);
+  console.log('  Settings UTxO:', settingsUTxO.txHash, '#', settingsUTxO.outputIndex);
+
+  const tx = await lucid
+    .newTx()
+    .collectFrom([settingsUTxO])
+    .mintAssets(
+      { [settingsUnit]: -1n }, // Burn 1 token (negative amount)
+      Data.void()
+    )
+    .pay.ToAddress(adminAddress, { lovelace: settingsUTxO.assets.lovelace })
+    .attach.MintingPolicy(mintScript)
+    .complete();
+
+  const signedTx = await tx.sign.withWallet().complete();
+  const txHash = await signedTx.submit();
+
+  console.log('Settings NFT burned! TX:', txHash);
+  await lucid.awaitTx(txHash);
+
+  // Step 6: Clear database reference
+  await resetPlatformSettings();
+
+  return txHash;
 }

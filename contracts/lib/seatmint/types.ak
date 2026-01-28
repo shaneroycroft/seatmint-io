@@ -6,6 +6,13 @@ use cardano/assets.{AssetName, PolicyId}
 // CORE PLATFORM TYPES
 // ============================================
 
+/// Market status enum - used instead of Bool for Lucid compatibility
+/// Aiken's Bool is a CBOR primitive (f5/f4), but Lucid uses Constr wrappers.
+pub type MarketStatus {
+  Inactive  // Constr(0, []) = d87980
+  Active    // Constr(1, []) = d87a80
+}
+
 /// Global platform settings stored in singleton UTxO
 /// Referenced by all validators for consistent configuration
 pub type GlobalSettings {
@@ -14,7 +21,7 @@ pub type GlobalSettings {
   // basis points (250 = 2.5%)
   platform_treasury: Address,
   // Platform controls
-  is_market_active: Bool,
+  is_market_active: MarketStatus,
   current_max_supply: Int,
   max_resale_multiplier: Int,
   // basis points (300 = 3x max resale)
@@ -47,52 +54,17 @@ pub type MintAction {
 // ============================================
 
 /// Primary sale configuration stored in UTxO datum
-/// Extensible design allows features to be enabled/disabled per event
+/// Simplified for basic buy flow - additional features can be added later
 pub type SaleDatum {
-  // Core identification
   organizer_address: Address,
   base_price: Int,
-  // Price in lovelace
   event_policy: PolicyId,
-  // Policy ID for minting NFTs
-  // Optional features (None = feature disabled)
-  sale_window: Option<TimeWindow>,
-  anti_scalping_rules: Option<AntiScalpingRules>,
-  whitelist: Option<Whitelist>,
-  pricing_strategy: PricingStrategy,
-}
-
-/// Time-based sale windows (presales, early access, limited availability)
-pub type TimeWindow {
-  start_time: Int,
-  // POSIXTime in milliseconds
-  end_time: Int,
-}
-
-/// Whitelist for presales and early access
-pub type Whitelist {
-  approved_addresses: List<VerificationKeyHash>,
-}
-
-/// Anti-scalping configuration to prevent bulk buying
-pub type AntiScalpingRules {
-  max_per_transaction: Int,
-  // Limit per tx (e.g., 4 tickets)
-  max_per_wallet: Int,
-  // Total limit per address
-  cooldown_period: Int,
-}
-
-/// Pricing strategies (extensible for future features)
-pub type PricingStrategy {
-  FixedPrice { price: Int }
 }
 
 /// Purchase action for primary sales
+/// Payment is calculated as: base_price * quantity
 pub type SaleRedeemer {
   quantity: Int,
-  payment_amount: Int,
-  // Total payment in lovelace
   buyer_pkh: VerificationKeyHash,
 }
 

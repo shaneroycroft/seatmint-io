@@ -13,6 +13,7 @@
     "@emurgo/cardano-serialization-lib-browser": "^15.0.3",
     "@lucid-evolution/lucid": "^0.4.29",
     "@supabase/supabase-js": "^2.90.1",
+    "@types/three": "^0.182.0",
     "bech32": "^2.0.0",
     "bip39": "^3.1.0",
     "blake2b": "^2.1.4",
@@ -21,7 +22,8 @@
     "lodash-es": "^4.17.21",
     "pbkdf2": "^3.1.2",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "three": "^0.182.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",

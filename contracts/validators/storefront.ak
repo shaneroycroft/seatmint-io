@@ -12,6 +12,9 @@ use seatmint/types.{
   GlobalSettings,
   StorefrontAction,
   TicketDatum,
+  MarketStatus,
+  Active,
+  Inactive,
   // Import constructors explicitly
   Buy,
   Cancel,
@@ -87,7 +90,7 @@ fn validate_purchase(
   tx: Transaction,
 ) -> Bool {
   // 1. Market must be active (emergency stop check)
-  let market_active = settings.is_market_active
+  let market_active = settings.is_market_active == Active
 
   // 2. Anti-Scalping: Enforce maximum resale price (Pillar 3)
   let max_price =
@@ -274,7 +277,7 @@ fn mock_address(pkh: ByteArray) -> Address {
 fn mock_settings(
   fee_bps: Int,
   treasury: Address,
-  is_active: Bool,
+  is_active: MarketStatus,
   max_resale: Int,
 ) -> GlobalSettings {
   GlobalSettings {
@@ -352,7 +355,7 @@ test purchase_succeeds_within_price_cap() {
   let resale_price = original_price * multiplier
 
   // 1x-3x
-  let settings = mock_settings(250, treasury, True, 300)
+  let settings = mock_settings(250, treasury, Active, 300)
   // 2.5% fee, 3x max
   let ticket = mock_ticket(seller, artist, original_price, resale_price, 1000)
   let datum_data: Data = ticket
@@ -432,7 +435,7 @@ test purchase_fails_exceeding_price_cap() {
   let resale_price = original_price * 4
 
   // 4x exceeds 3x cap
-  let settings = mock_settings(250, treasury, True, 300)
+  let settings = mock_settings(250, treasury, Active, 300)
   let ticket = mock_ticket(seller, artist, original_price, resale_price, 1000)
   let datum_data: Data = ticket
   let redeemer_data: Data = Buy { buyer }
@@ -474,7 +477,7 @@ test purchase_distributes_payments_correctly() {
   let price = 20_000_000
 
   // 20 ADA
-  let settings = mock_settings(250, treasury, True, 300)
+  let settings = mock_settings(250, treasury, Active, 300)
   // 2.5% fee
   let ticket = mock_ticket(seller, artist, 10_000_000, price, 1000)
   let datum_data: Data = ticket
@@ -553,7 +556,7 @@ test cancel_succeeds_with_seller_signature() {
   let artist = mock_address(artist_pkh)
   let treasury = mock_address(treasury_pkh)
 
-  let settings = mock_settings(250, treasury, True, 300)
+  let settings = mock_settings(250, treasury, Active, 300)
   let ticket = mock_ticket(seller, artist, 10_000_000, 15_000_000, 1000)
   let datum_data: Data = ticket
   let redeemer_data: Data = Cancel
@@ -597,7 +600,7 @@ test cancel_fails_without_seller_signature() {
   let artist = mock_address(artist_pkh)
   let treasury = mock_address(treasury_pkh)
 
-  let settings = mock_settings(250, treasury, True, 300)
+  let settings = mock_settings(250, treasury, Active, 300)
   let ticket = mock_ticket(seller, artist, 10_000_000, 15_000_000, 1000)
   let datum_data: Data = ticket
   let redeemer_data: Data = Cancel
@@ -636,7 +639,7 @@ test purchase_fails_when_market_inactive() {
   let buyer = mock_address(buyer_pkh)
   let treasury = mock_address(treasury_pkh)
 
-  let settings = mock_settings(250, treasury, False, 300)
+  let settings = mock_settings(250, treasury, Inactive, 300)
   // Market inactive
   let ticket = mock_ticket(seller, artist, 10_000_000, 15_000_000, 1000)
   let datum_data: Data = ticket
@@ -677,7 +680,7 @@ test transfer_succeeds_as_gift() {
   let recipient = mock_address(recipient_pkh)
   let treasury = mock_address(treasury_pkh)
 
-  let settings = mock_settings(250, treasury, True, 300)
+  let settings = mock_settings(250, treasury, Active, 300)
   let ticket = mock_ticket(seller, artist, 10_000_000, 15_000_000, 1000)
   let datum_data: Data = ticket
   let redeemer_data: Data = TransferTicket { new_owner: recipient }
@@ -723,7 +726,7 @@ test purchase_fails_without_buyer_signature() {
   let buyer = mock_address(buyer_pkh)
   let treasury = mock_address(treasury_pkh)
 
-  let settings = mock_settings(250, treasury, True, 300)
+  let settings = mock_settings(250, treasury, Active, 300)
   let ticket = mock_ticket(seller, artist, 10_000_000, 15_000_000, 1000)
   let datum_data: Data = ticket
   let redeemer_data: Data = Buy { buyer }
@@ -763,7 +766,7 @@ test purchase_fails_missing_nft_transfer() {
   let treasury = mock_address(treasury_pkh)
 
   let price = 15_000_000
-  let settings = mock_settings(250, treasury, True, 300)
+  let settings = mock_settings(250, treasury, Active, 300)
   let ticket = mock_ticket(seller, artist, 10_000_000, price, 1000)
   let datum_data: Data = ticket
   let redeemer_data: Data = Buy { buyer }
