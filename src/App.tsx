@@ -1,18 +1,22 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLucid } from "./hooks/useLucid";
 import { useGenesis } from "./hooks/useGenesis";
 import { TicketMarketplace } from "./components/TicketMarketplace";
 import { EventsPage } from "./components/EventsPage";
 import { OrganizerDashboard } from "./components/OrganizerDashboard";
 import { PlatformSettings } from "./components/PlatformSettings";
+import { SeatVisualizer } from "./components/SeatVisualizer";
 import { Layout } from "./components/layout";
 import { ToastProvider } from "./contexts/ToastContext";
-import { BRAND, isAuthorizedOrganizer } from "./constants";
+import { BRAND } from "./constants";
+import { checkOrganizerAccess } from "./services/ticketService";
 
-type AppTab = 'setup' | 'events' | 'my-tickets' | 'organizer' | 'settings';
+type AppTab = 'setup' | 'events' | 'my-tickets' | 'organizer' | 'venue-designer' | 'settings';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<AppTab>('setup');
+  const [isOrganizer, setIsOrganizer] = useState(false);
+  const [checkingOrganizer, setCheckingOrganizer] = useState(false);
 
   const {
     lucid,
@@ -22,7 +26,9 @@ export default function App() {
     error: walletError,
     connectWallet,
     disconnectWallet,
-    availableWallets
+    availableWallets,
+    walletChanged,
+    acknowledgeWalletChange,
   } = useLucid();
 
   const {
@@ -33,6 +39,40 @@ export default function App() {
     initializePlatform
   } = useGenesis();
 
+  // Handle wallet changes - redirect to setup tab
+  useEffect(() => {
+    if (walletChanged) {
+      console.log('🔄 Wallet changed detected in App, redirecting to setup...');
+      setActiveTab('setup');
+      setIsOrganizer(false);  // Reset organizer status
+      acknowledgeWalletChange();
+    }
+  }, [walletChanged, acknowledgeWalletChange]);
+
+  // Check organizer access when wallet connects or changes
+  useEffect(() => {
+    const checkAccess = async () => {
+      if (!lucid || !address || !isInitialized) {
+        setIsOrganizer(false);
+        return;
+      }
+
+      setCheckingOrganizer(true);
+      try {
+        const hasAccess = await checkOrganizerAccess(lucid);
+        setIsOrganizer(hasAccess);
+        console.log('Organizer access check:', hasAccess ? '✅ Has Settings NFT' : '❌ No Settings NFT');
+      } catch (err) {
+        console.error('Failed to check organizer access:', err);
+        setIsOrganizer(false);
+      } finally {
+        setCheckingOrganizer(false);
+      }
+    };
+
+    checkAccess();
+  }, [lucid, address, isInitialized]);
+
   const handleInitialize = async () => {
     if (lucid && address) {
       await initializePlatform(lucid, address);
@@ -40,7 +80,6 @@ export default function App() {
   };
 
   const isPlatformReady = isConnected && isInitialized && lucid && address;
-  const isOrganizer = isAuthorizedOrganizer(address ?? undefined);
 
   return (
     <ToastProvider>
@@ -165,6 +204,13 @@ export default function App() {
                 <p className="text-blue-100 text-sm">
                   Browse "Events" for new tickets, check "Resale" for deals, or manage yours in "My Tickets".
                 </p>
+                {checkingOrganizer ? (
+                  <p className="text-blue-200 text-xs mt-3">Checking organizer access...</p>
+                ) : isOrganizer && (
+                  <p className="text-yellow-200 text-xs mt-3 font-semibold">
+                    ✨ Organizer access enabled
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -184,6 +230,15 @@ export default function App() {
       {/* Organizer Dashboard */}
       {activeTab === 'organizer' && isPlatformReady && isOrganizer && (
         <OrganizerDashboard lucid={lucid} userAddress={address!} />
+      )}
+
+      {/* Venue Designer (Organizer) */}
+      {activeTab === 'venue-designer' && isPlatformReady && isOrganizer && (
+        <div className="h-full w-full">
+          <SeatVisualizer
+            onSeatSelect={(seat) => console.log('Seat selected:', seat)}
+          />
+        </div>
       )}
 
       {/* Platform Settings (Admin) */}

@@ -1064,6 +1064,263 @@ export async function transferTicket(
 }
 
 // ============================================
+// ORGANIZER ACCESS CHECK (Settings NFT)
+// ============================================
+
+/**
+ * Check if the connected wallet has organizer access
+ *
+ * Organizer access is granted to wallets that hold the Settings NFT.
+ * This ensures only the platform admin can create events and manage settings.
+ *
+ * @returns true if wallet contains Settings NFT, false otherwise
+ */
+export async function checkOrganizerAccess(lucid: LucidEvolution): Promise<boolean> {
+  try {
+    // Get the settings policy ID from database
+    const { data: config, error } = await supabase
+      .from('platform_config')
+      .select('settings_policy_id')
+      .eq('id', 'main')
+      .maybeSingle();
+
+    if (error || !config?.settings_policy_id) {
+      console.log('No platform settings found - organizer access denied');
+      return false;
+    }
+
+    const settingsPolicyId = config.settings_policy_id;
+
+    // Check if wallet contains any NFT with this policy ID
+    const walletUtxos = await lucid.wallet().getUtxos();
+
+    for (const utxo of walletUtxos) {
+      for (const [unit] of Object.entries(utxo.assets)) {
+        if (unit === 'lovelace') continue;
+
+        // Extract policy ID (first 56 chars of unit)
+        const policyId = unit.slice(0, 56);
+        if (policyId === settingsPolicyId) {
+          console.log('✅ Settings NFT found in wallet - organizer access granted');
+          return true;
+        }
+      }
+    }
+
+    console.log('❌ Settings NFT not found in wallet - organizer access denied');
+    return false;
+  } catch (err) {
+    console.error('Error checking organizer access:', err);
+    return false;
+  }
+}
+
+// ============================================
+// WALLET SYNC (DB as Cache Reconciliation)
+// ============================================
+
+export interface SyncResult {
+  discovered: number;      // New tickets found in wallet, added to DB
+  updated: number;         // Existing tickets with ownership updated
+  alreadySynced: number;   // Tickets already correctly in DB
+}
+
+/**
+ * Sync Wallet Tickets with Database
+ *
+ * Scans the user's wallet for ticket NFTs and reconciles with the database.
+ * This implements the "DB as cache" pattern - on-chain state is the source of truth.
+ *
+ * - Discovers tickets in wallet that aren't in DB (creates records)
+ * - Updates ownership for tickets that were transferred to this wallet
+ * - Does NOT remove tickets from DB if not in wallet (could be listed/transferred)
+ */
+export async function syncWalletTickets(
+  lucid: LucidEvolution,
+  userAddress: string
+): Promise<SyncResult> {
+  console.log('Syncing wallet tickets for:', userAddress);
+
+  const result: SyncResult = { discovered: 0, updated: 0, alreadySynced: 0 };
+
+  try {
+    // Step 1: Get all known event policies from database
+    const { data: events, error: eventsError } = await supabase
+      .from('events')
+      .select('id, event_policy_id, event_name, ticket_tiers(id, tier_name, price_lovelace)');
+
+    if (eventsError || !events) {
+      console.error('Failed to fetch events for sync:', eventsError);
+      return result;
+    }
+
+    // Build a map of policy -> event info for quick lookup
+    const policyToEvent = new Map<string, {
+      eventId: string;
+      eventName: string;
+      tierId: string;
+      tierName: string;
+      priceLovalace: number;
+    }>();
+
+    events.forEach(event => {
+      if (event.event_policy_id && event.ticket_tiers?.length > 0) {
+        const tier = event.ticket_tiers[0]; // Use first tier for discovered tickets
+        policyToEvent.set(event.event_policy_id, {
+          eventId: event.id,
+          eventName: event.event_name,
+          tierId: tier.id,
+          tierName: tier.tier_name,
+          priceLovalace: tier.price_lovelace,
+        });
+      }
+    });
+
+    console.log('Known event policies:', policyToEvent.size);
+
+    // Step 2: Get all wallet UTxOs
+    const walletUtxos = await lucid.wallet().getUtxos();
+    console.log('Wallet UTxOs:', walletUtxos.length);
+
+    // Step 3: Extract ticket NFTs (assets matching known event policies)
+    const ticketsInWallet: Array<{
+      policyId: string;
+      assetName: string;
+      eventInfo: typeof policyToEvent extends Map<string, infer V> ? V : never;
+    }> = [];
+
+    for (const utxo of walletUtxos) {
+      for (const [unit, qty] of Object.entries(utxo.assets)) {
+        if (unit === 'lovelace' || qty !== 1n) continue;
+
+        // Extract policy ID (first 56 chars) and asset name (rest)
+        const policyId = unit.slice(0, 56);
+        const assetName = unit.slice(56);
+
+        const eventInfo = policyToEvent.get(policyId);
+        if (eventInfo) {
+          ticketsInWallet.push({ policyId, assetName, eventInfo });
+        }
+      }
+    }
+
+    console.log('Ticket NFTs found in wallet:', ticketsInWallet.length);
+
+    // Step 4: For each ticket, ensure DB record exists and ownership is correct
+    for (const ticket of ticketsInWallet) {
+      // Check if ticket exists in database (use maybeSingle to avoid 406 when not found)
+      const { data: existingTicket, error: fetchError } = await supabase
+        .from('tickets')
+        .select('id, current_owner_address')
+        .eq('nft_asset_name', ticket.assetName)
+        .maybeSingle();
+
+      if (fetchError) {
+        console.error('Error checking ticket:', fetchError);
+        continue;
+      }
+
+      if (!existingTicket) {
+        // Ticket not in DB - create record
+        console.log('Discovering new ticket:', ticket.assetName);
+
+        // Get next ticket number for this tier
+        const { data: maxTicket } = await supabase
+          .from('tickets')
+          .select('ticket_number')
+          .eq('tier_id', ticket.eventInfo.tierId)
+          .order('ticket_number', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const nextTicketNumber = (maxTicket?.ticket_number || 0) + 1;
+
+        const { error: insertError } = await supabase.from('tickets').insert({
+          event_id: ticket.eventInfo.eventId,
+          tier_id: ticket.eventInfo.tierId,
+          nft_asset_name: ticket.assetName,
+          ticket_number: nextTicketNumber,
+          current_owner_address: userAddress,
+          original_buyer_address: userAddress, // Assume current owner bought it
+          status: 'minted',
+          minted_at: new Date().toISOString(),
+        });
+
+        if (insertError) {
+          console.error('Failed to insert discovered ticket:', insertError);
+        } else {
+          result.discovered++;
+        }
+      } else if (existingTicket.current_owner_address !== userAddress) {
+        // Ticket exists but ownership doesn't match - update it
+        console.log('Updating ownership for ticket:', ticket.assetName);
+        const { error: updateError } = await supabase
+          .from('tickets')
+          .update({ current_owner_address: userAddress, status: 'minted' })
+          .eq('id', existingTicket.id);
+
+        if (updateError) {
+          console.error('Failed to update ticket ownership:', updateError);
+        } else {
+          result.updated++;
+        }
+      } else {
+        result.alreadySynced++;
+      }
+    }
+
+    console.log('Sync complete:', result);
+    return result;
+
+  } catch (err) {
+    console.error('Wallet sync failed:', err);
+    return result;
+  }
+}
+
+/**
+ * Recalculate tier supply based on actual minted tickets
+ * Call this to fix supply counts that got out of sync
+ */
+export async function recalculateTierSupply(tierId: string): Promise<void> {
+  // Count actual tickets for this tier
+  const { count, error: countError } = await supabase
+    .from('tickets')
+    .select('*', { count: 'exact', head: true })
+    .eq('tier_id', tierId);
+
+  if (countError) {
+    console.error('Failed to count tickets:', countError);
+    return;
+  }
+
+  // Get tier total supply
+  const { data: tier, error: tierError } = await supabase
+    .from('ticket_tiers')
+    .select('total_supply')
+    .eq('id', tierId)
+    .single();
+
+  if (tierError || !tier) {
+    console.error('Failed to fetch tier:', tierError);
+    return;
+  }
+
+  // Update remaining supply
+  const remaining = Math.max(0, tier.total_supply - (count || 0));
+  const { error: updateError } = await supabase
+    .from('ticket_tiers')
+    .update({ remaining_supply: remaining })
+    .eq('id', tierId);
+
+  if (updateError) {
+    console.error('Failed to update tier supply:', updateError);
+  } else {
+    console.log(`Tier ${tierId} supply recalculated: ${remaining} remaining`);
+  }
+}
+
+// ============================================
 // HELPER FUNCTIONS
 // ============================================
 
@@ -1169,10 +1426,22 @@ async function recordTicketPurchase(
   console.log('  Buyer:', buyerAddress);
   console.log('  Ticket names:', ticketNames);
 
-  const tickets = ticketNames.map(name => ({
+  // Get the current max ticket_number for this tier
+  const { data: maxTicket } = await supabase
+    .from('tickets')
+    .select('ticket_number')
+    .eq('tier_id', params.tierId)
+    .order('ticket_number', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const startingTicketNumber = (maxTicket?.ticket_number || 0) + 1;
+
+  const tickets = ticketNames.map((name, index) => ({
     event_id: params.eventId,
     tier_id: params.tierId,
     nft_asset_name: name,
+    ticket_number: startingTicketNumber + index,
     current_owner_address: buyerAddress,
     original_buyer_address: buyerAddress,
     mint_tx_hash: txHash,
@@ -1186,7 +1455,7 @@ async function recordTicketPurchase(
     console.error('Failed to insert tickets:', ticketsError);
     throw new Error(`Failed to record ticket purchase: ${ticketsError.message}`);
   }
-  console.log('Tickets inserted successfully');
+  console.log('Tickets inserted successfully with ticket_numbers starting at:', startingTicketNumber);
 
   // Try RPC function first, fall back to direct update if it doesn't exist
   const { error: rpcError } = await supabase.rpc('decrement_tier_supply', {

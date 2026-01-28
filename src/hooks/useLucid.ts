@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Lucid, Blockfrost, Network } from '@lucid-evolution/lucid';
 
 // Supported Cardano wallets
@@ -16,6 +16,8 @@ interface UseLucidReturn {
   connectWallet: (walletName: WalletName) => Promise<void>;
   disconnectWallet: () => void;
   availableWallets: WalletName[];
+  walletChanged: boolean;  // True when wallet was changed externally
+  acknowledgeWalletChange: () => void;  // Call to reset walletChanged flag
 }
 
 export const useLucid = (): UseLucidReturn => {
@@ -25,12 +27,23 @@ export const useLucid = (): UseLucidReturn => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [availableWallets, setAvailableWallets] = useState<WalletName[]>([]);
+  const [walletChanged, setWalletChanged] = useState(false);
+
+  // Track the current wallet API and address for change detection
+  const walletApiRef = useRef<any>(null);
+  const currentAddressRef = useRef<string | null>(null);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Acknowledge wallet change (reset flag)
+  const acknowledgeWalletChange = useCallback(() => {
+    setWalletChanged(false);
+  }, []);
 
   // Check which wallets are installed
   useEffect(() => {
     const checkWallets = () => {
       const wallets: WalletName[] = [];
-      
+
       if (window.cardano?.nami) wallets.push('nami');
       if (window.cardano?.eternl) wallets.push('eternl');
       if (window.cardano?.flint) wallets.push('flint');
@@ -38,7 +51,7 @@ export const useLucid = (): UseLucidReturn => {
       if (window.cardano?.gerowallet) wallets.push('gerowallet');
       if (window.cardano?.typhon) wallets.push('typhon');
       if (window.cardano?.yoroi) wallets.push('yoroi');
-      
+
       setAvailableWallets(wallets);
     };
 
@@ -50,6 +63,55 @@ export const useLucid = (): UseLucidReturn => {
 
     return () => clearTimeout(timeout);
   }, []);
+
+  // Poll for wallet address changes (detects wallet switching)
+  useEffect(() => {
+    if (!isConnected || !walletApiRef.current) {
+      // Clear polling when disconnected
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+      return;
+    }
+
+    const checkForAddressChange = async () => {
+      try {
+        // Get current addresses from wallet
+        const addresses = await walletApiRef.current.getUsedAddresses();
+        if (addresses && addresses.length > 0) {
+          // Wallet API returns hex-encoded addresses, we need to compare
+          // For simplicity, we'll re-query through lucid
+          if (lucid) {
+            const currentAddress = await lucid.wallet().address();
+            if (currentAddressRef.current && currentAddress !== currentAddressRef.current) {
+              console.log('🔄 Wallet change detected!');
+              console.log('  Previous:', currentAddressRef.current?.slice(0, 20) + '...');
+              console.log('  Current:', currentAddress.slice(0, 20) + '...');
+
+              // Update state
+              setAddress(currentAddress);
+              currentAddressRef.current = currentAddress;
+              setWalletChanged(true);
+            }
+          }
+        }
+      } catch (err) {
+        // Wallet might have been locked or disconnected externally
+        console.warn('Error checking wallet address:', err);
+      }
+    };
+
+    // Poll every 2 seconds
+    pollingIntervalRef.current = setInterval(checkForAddressChange, 2000);
+
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
+  }, [isConnected, lucid]);
 
   const connectWallet = async (walletName: WalletName) => {
     setIsConnecting(true);
@@ -77,13 +139,18 @@ export const useLucid = (): UseLucidReturn => {
       // Get the user's address
       const userAddress = await lucidInstance.wallet().address();
 
+      // Store refs for change detection
+      walletApiRef.current = walletApi;
+      currentAddressRef.current = userAddress;
+
       setLucid(lucidInstance);
       setAddress(userAddress);
       setIsConnected(true);
+      setWalletChanged(false);  // Reset on fresh connect
 
       // Store connected wallet in localStorage
       localStorage.setItem('connectedWallet', walletName);
-      
+
       console.log(`✅ Connected to ${walletName}:`, userAddress);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
@@ -95,10 +162,13 @@ export const useLucid = (): UseLucidReturn => {
   };
 
   const disconnectWallet = () => {
+    walletApiRef.current = null;
+    currentAddressRef.current = null;
     setLucid(null);
     setAddress(null);
     setIsConnected(false);
     setError(null);
+    setWalletChanged(false);
     localStorage.removeItem('connectedWallet');
     console.log('🔌 Wallet disconnected');
   };
@@ -121,5 +191,7 @@ export const useLucid = (): UseLucidReturn => {
     connectWallet,
     disconnectWallet,
     availableWallets,
+    walletChanged,
+    acknowledgeWalletChange,
   };
 };

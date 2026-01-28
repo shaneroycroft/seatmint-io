@@ -5,6 +5,7 @@ import {
   purchaseFromStorefront,
   cancelStorefrontListing,
   transferTicket,
+  syncWalletTickets,
 } from '../services/ticketService';
 import { useToast, TOAST_MESSAGES } from '../contexts/ToastContext';
 
@@ -56,6 +57,8 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [_lastSyncResult, setLastSyncResult] = useState<{ discovered: number; updated: number } | null>(null);
   const toast = useToast();
 
   const platformFeePercent = 2;
@@ -75,10 +78,53 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
     loadData();
   }, [userAddress]);
 
+  const handleSync = async () => {
+    if (!lucid || isSyncing) return;
+
+    setIsSyncing(true);
+    try {
+      const result = await syncWalletTickets(lucid, userAddress);
+      setLastSyncResult({ discovered: result.discovered, updated: result.updated });
+
+      if (result.discovered > 0 || result.updated > 0) {
+        toast.success(
+          'Wallet Synced',
+          `Found ${result.discovered} new ticket(s), updated ${result.updated} record(s)`
+        );
+        // Reload data after sync
+        await loadDataInternal();
+      } else {
+        toast.success('Wallet Synced', 'Your tickets are already up to date');
+      }
+    } catch (err) {
+      console.error('Sync failed:', err);
+      toast.error('Sync Failed', 'Could not sync wallet with database');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const loadData = async () => {
     setLoading(true);
     console.log('TicketMarketplace: Loading data for address:', userAddress);
 
+    // Auto-sync wallet on load if lucid is available
+    if (lucid) {
+      try {
+        const syncResult = await syncWalletTickets(lucid, userAddress);
+        if (syncResult.discovered > 0 || syncResult.updated > 0) {
+          console.log('Auto-sync found changes:', syncResult);
+          setLastSyncResult({ discovered: syncResult.discovered, updated: syncResult.updated });
+        }
+      } catch (syncErr) {
+        console.warn('Auto-sync failed:', syncErr);
+      }
+    }
+
+    await loadDataInternal();
+  };
+
+  const loadDataInternal = async () => {
     try {
       const { data: listingsData, error: listingsError } = await supabase
         .from('tickets')
@@ -317,8 +363,8 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
             </h2>
           </div>
 
-          {/* Tab Switcher */}
-          <div className="flex gap-2">
+          {/* Tab Switcher and Sync */}
+          <div className="flex gap-2 items-center">
             <button
               onClick={() => setActiveTab('browse')}
               className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all ${
@@ -338,6 +384,17 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
               }`}
             >
               My Tickets ({myTickets.length})
+            </button>
+            <button
+              onClick={handleSync}
+              disabled={isSyncing || !lucid}
+              className="px-3 py-2 rounded-lg text-sm font-medium text-blue-600 hover:bg-blue-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+              title="Sync wallet with database"
+            >
+              <svg className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {isSyncing ? 'Syncing...' : 'Sync'}
             </button>
           </div>
         </div>

@@ -28,6 +28,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'my-tickets', label: 'My Tickets', requiresReady: true },
     ...(isOrganizer ? [
       { id: 'organizer', label: 'Organizer', requiresReady: true, isSecondary: true },
+      { id: 'venue-designer', label: 'Venue', requiresReady: true, isSecondary: true },
       { id: 'settings', label: 'Settings', requiresReady: true, isSecondary: true },
     ] : []),
   ];

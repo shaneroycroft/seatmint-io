@@ -6,11 +6,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **SeatMint** is a decentralized ticketing platform on Cardano using **Plutus V3** (Aiken >= v1.1.17) and **Lucid Evolution**.
 
-- **Frontend**: React (TypeScript) + Vite + Tailwind CSS
+- **Frontend**: React (TypeScript) + Vite + Tailwind CSS v4
 - **Database**: Supabase (events, tickets, ticket_tiers, secondary_listings, platform_config tables)
-- **Blockchain**: Cardano (Preprod/Preview)
+- **Blockchain**: Cardano Preview Testnet
 - **Validation Logic**: Aiken Smart Contracts in `contracts/`
 - **Transaction Building**: Lucid Evolution (Client-side in `src/services/`)
+- **3D Visualization**: Three.js (SeatVisualizer venue designer)
+
+## Environment Variables
+
+Required in `.env`:
+```
+VITE_BLOCKFROST_API_KEY=<your-preview-key>
+VITE_NETWORK=Preview
+VITE_SUPABASE_URL=<your-supabase-url>
+VITE_SUPABASE_API_KEY=<your-supabase-anon-key>
+```
 
 ## Development Commands
 
@@ -45,11 +56,23 @@ aiken docs           # Generate HTML documentation
 
 ### Key Files
 
-- `src/services/ticketService.ts` - All blockchain interactions (create event, purchase, list, resale)
+- `src/services/ticketService.ts` - All blockchain interactions (create event, purchase, list, resale, wallet sync)
 - `src/services/transactionBuilder.ts` - Lower-level transaction building utilities
 - `src/utils/plutusScripts.ts` - Validator loading and parameter application
+- `src/hooks/useLucid.ts` - Wallet connection hook (Nami, Eternl, Lace, etc.)
+- `src/hooks/useGenesis.ts` - Platform initialization hook
+- `src/constants.ts` - Brand config and organizer authorization
+- `src/components/SeatVisualizer.tsx` - Three.js 3D venue designer
 - `contracts/validators/types.ak` - Aiken type definitions (source of truth for datum/redeemer schemas)
 - `contracts/lib/seatmint/types.ak` - Shared library types
+
+### Navigation Architecture
+
+The app uses internal tab-based navigation (not react-router). Tabs are defined in `Header.tsx`:
+- **Primary tabs**: Setup, Events, My Tickets (all users)
+- **Secondary tabs** (organizer-only): Organizer, Venue, Settings
+
+Tab visibility is controlled by `isOrganizer` from `constants.ts`. In dev mode (empty `AUTHORIZED_ORGANIZERS` array), all users see organizer tabs.
 
 ### Type Definitions Alignment
 
@@ -119,10 +142,40 @@ Generate N unique asset names, add all to one `mintAssets` dictionary, submit as
 
 | Error | Cause | Fix |
 |-------|-------|-----|
-| "Settings UTxO not found on chain" | DB points to spent UTxO | Delete `platform_config` row, re-run `initializePlatformSettings()` |
+| "Settings UTxO not found on chain" | DB points to spent/missing UTxO (ghost reference) | Call `resetPlatformSettings()` then `initializePlatformSettings()` |
 | "Script execution failed (Spend[0])" | Datum mismatch (usually Bool or Address) | Verify datum structure with `Data.from(datum, Schema)` before building |
+| "Script execution failed (Spend[1])" | Multiple script inputs, second one failing | Check wallet UTxOs aren't at script addresses; filter with `!utxo.datum` |
 | "Value Not Conserved" | Inputs ≠ Outputs + Fee | Convert ADA to lovelace: `BigInt(Math.floor(ada * 1_000_000))` |
 | "Policy ID mismatch" | Wrong parameters applied to validator | Ensure organizer PKH matches event creator |
+| Repeated 404s from awaitTx | Transaction rejected (double-spend or validation failure) | Check if UTxO was already spent; refresh UTxO set before building |
+| Supabase 406 Not Acceptable | Using `.single()` when 0 or >1 rows | Use `.maybeSingle()` for queries that may return no results |
+| ticket_number NOT NULL constraint | Insert missing ticket_number field | Query max ticket_number for tier, increment by 1 |
+
+### Ghost Reference Pattern
+
+When the database's `platform_config.settings_utxo_ref` points to a UTxO that no longer exists on-chain (e.g., after testnet reset), the fix is:
+
+```typescript
+// In PlatformSettings.tsx handleResetAndReinitialize
+try {
+  await burnSettingsNft(lucid);
+} catch (err) {
+  if (err.message.includes('not found on chain')) {
+    await resetPlatformSettings();  // Clear stale DB reference
+  }
+}
+await initializePlatformSettings(lucid, {...});
+```
+
+### Database/Chain Desync
+
+The `awaitTx()` call can timeout/fail even if the transaction succeeded on-chain. To prevent desync, record purchases **optimistically** after `submit()` but before `awaitTx()`:
+
+```typescript
+const txHash = await signedTx.submit();
+await recordTicketPurchase(params, ticketNames, txHash, buyerAddress);  // Optimistic
+await lucid.awaitTx(txHash);  // May fail but tx might be on-chain
+```
 
 ## Platform Initialization
 
@@ -134,6 +187,76 @@ await initializePlatformSettings(lucid, { platformFeeBps: 250 });
 ```
 
 This creates the Settings NFT that all validators reference. Settings are stored in Supabase `platform_config` table.
+
+## Sale UTxO Selection
+
+Multiple events share the same `primary_sale` script address. When purchasing, find the correct sale UTxO by matching the `event_policy` field in the datum:
+
+```typescript
+const saleUTxOs = await lucid.utxosAt(saleAddress);
+const saleUTxO = saleUTxOs.find(utxo => {
+  const decoded = Data.from(utxo.datum);
+  return decoded.fields[2] === tier.events.event_policy_id;  // event_policy is 3rd field
+});
+```
+
+## Database Schema Notes
+
+- **tickets.current_owner_address**: Must exactly match the connected wallet's bech32 address for "My Tickets" queries
+- **tickets.ticket_number**: Required NOT NULL field; use `maybeSingle()` to find max, then increment
+- **ticket_tiers.remaining_supply**: Decremented on purchase; use RPC `decrement_tier_supply` or direct update fallback
+- **platform_config**: Singleton row (id='main') storing settings_policy_id and settings_utxo_ref
+
+## Wallet Sync Pattern (DB as Cache)
+
+The database is a cache; on-chain state is the source of truth. Use `syncWalletTickets()` to reconcile:
+
+```typescript
+import { syncWalletTickets } from './services/ticketService';
+const result = await syncWalletTickets(lucid, userAddress);
+// result: { discovered: 2, updated: 1, alreadySynced: 5 }
+```
+
+**Behavior**:
+- Scans wallet UTxOs for NFTs matching known event policy IDs
+- Creates DB records for tickets found in wallet but not in DB (discovered)
+- Updates ownership for tickets transferred to this wallet (updated)
+- Does NOT remove tickets from DB if not in wallet (could be listed elsewhere)
+
+**When to sync**: Auto-syncs on TicketMarketplace load; manual sync button available.
+
+## SeatVisualizer (Three.js Venue Designer)
+
+Located at `src/components/SeatVisualizer.tsx`. Organizer-only tool for designing venue layouts.
+
+**Features**:
+- Design mode: Configure tiers (Orchestra, Mezzanine), stage width, obstructions
+- Preview mode: Click seats to view from that position (POV camera)
+- Venue templates: Stadium, Club, Amphitheater presets
+- Instanced meshes for performance with large seat counts
+
+**Integration notes**:
+- Requires parent container with explicit height (`h-full w-full` wrapper in App.tsx)
+- Uses WebGL; check for browser support if rendering issues occur
+- Currently standalone; future work to connect seat metadata with ticket NFTs
+
+## Toast Notifications
+
+Use the toast context for user feedback on transactions:
+
+```typescript
+import { useToast } from './contexts/ToastContext';
+const toast = useToast();
+
+// Transaction flow
+const id = toast.pending('Purchasing tickets...');
+try {
+  await purchaseTickets(...);
+  toast.updateToast(id, { type: 'success', title: 'Purchase complete!' });
+} catch (err) {
+  toast.updateToast(id, { type: 'error', title: 'Purchase failed', message: err.message });
+}
+```
 
 ## Git Workflow
 
