@@ -7,13 +7,24 @@ import { OrganizerDashboard } from "./components/OrganizerDashboard";
 import { PlatformSettings } from "./components/PlatformSettings";
 import { SeatVisualizer } from "./components/SeatVisualizer";
 import { Layout } from "./components/layout";
-import { ToastProvider } from "./contexts/ToastContext";
+import { ToastProvider, useToast } from "./contexts/ToastContext";
 import { BRAND } from "./constants";
 import { checkOrganizerAccess } from "./services/ticketService";
 
 type AppTab = 'setup' | 'events' | 'my-tickets' | 'organizer' | 'venue-designer' | 'settings';
 
+// Main App wrapper that provides ToastContext
 export default function App() {
+  return (
+    <ToastProvider>
+      <AppContent />
+    </ToastProvider>
+  );
+}
+
+// Inner component that can use toast notifications
+function AppContent() {
+  const toast = useToast();
   const [activeTab, setActiveTab] = useState<AppTab>('setup');
   const [isOrganizer, setIsOrganizer] = useState(false);
   const [checkingOrganizer, setCheckingOrganizer] = useState(false);
@@ -46,8 +57,9 @@ export default function App() {
       setActiveTab('setup');
       setIsOrganizer(false);  // Reset organizer status
       acknowledgeWalletChange();
+      toast.info('Wallet Changed', 'Your wallet has changed. Please verify your connection.');
     }
-  }, [walletChanged, acknowledgeWalletChange]);
+  }, [walletChanged, acknowledgeWalletChange, toast]);
 
   // Check organizer access when wallet connects or changes
   useEffect(() => {
@@ -82,7 +94,6 @@ export default function App() {
   const isPlatformReady = isConnected && isInitialized && lucid && address;
 
   return (
-    <ToastProvider>
     <Layout
       isConnected={isConnected}
       address={address ?? undefined}
@@ -206,9 +217,13 @@ export default function App() {
                 </p>
                 {checkingOrganizer ? (
                   <p className="text-blue-200 text-xs mt-3">Checking organizer access...</p>
-                ) : isOrganizer && (
+                ) : isOrganizer ? (
                   <p className="text-yellow-200 text-xs mt-3 font-semibold">
                     ✨ Organizer access enabled
+                  </p>
+                ) : (
+                  <p className="text-blue-200 text-xs mt-3">
+                    Standard user access. Organizer features require the Settings NFT.
                   </p>
                 )}
               </div>
@@ -234,7 +249,7 @@ export default function App() {
 
       {/* Venue Designer (Organizer) */}
       {activeTab === 'venue-designer' && isPlatformReady && isOrganizer && (
-        <div className="h-full w-full">
+        <div className="w-full" style={{ height: 'calc(100vh - 4rem)' }}>
           <SeatVisualizer
             onSeatSelect={(seat) => console.log('Seat selected:', seat)}
           />
@@ -246,6 +261,5 @@ export default function App() {
         <PlatformSettings lucid={lucid} adminAddress={address!} />
       )}
     </Layout>
-    </ToastProvider>
   );
 }

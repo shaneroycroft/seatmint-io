@@ -1116,6 +1116,101 @@ export async function checkOrganizerAccess(lucid: LucidEvolution): Promise<boole
 }
 
 // ============================================
+// WALLET TICKET SCANNING
+// ============================================
+
+export interface WalletTicketNft {
+  policyId: string;
+  assetName: string;     // hex-encoded
+  unit: string;          // policyId + assetName
+  eventId: string;
+  eventName: string;
+  tierId: string;
+  tierName: string;
+  priceLovalace: number;
+}
+
+/**
+ * Get Ticket NFTs from Wallet
+ *
+ * Scans the user's wallet for ticket NFTs that belong to known events.
+ * This is the "wallet-first" approach - only returns tickets actually in the wallet.
+ *
+ * @returns Array of ticket NFT info for tickets in the wallet
+ */
+export async function getWalletTicketNfts(lucid: LucidEvolution): Promise<WalletTicketNft[]> {
+  console.log('Scanning wallet for ticket NFTs...');
+
+  // Step 1: Get all known event policies from database
+  const { data: events, error: eventsError } = await supabase
+    .from('events')
+    .select('id, event_policy_id, event_name, ticket_tiers(id, tier_name, price_lovelace)');
+
+  if (eventsError || !events) {
+    console.error('Failed to fetch events:', eventsError);
+    return [];
+  }
+
+  // Build a map of policy -> event info for quick lookup
+  const policyToEvent = new Map<string, {
+    eventId: string;
+    eventName: string;
+    tierId: string;
+    tierName: string;
+    priceLovalace: number;
+  }>();
+
+  events.forEach(event => {
+    if (event.event_policy_id && event.ticket_tiers?.length > 0) {
+      const tier = event.ticket_tiers[0];
+      policyToEvent.set(event.event_policy_id, {
+        eventId: event.id,
+        eventName: event.event_name,
+        tierId: tier.id,
+        tierName: tier.tier_name,
+        priceLovalace: tier.price_lovelace,
+      });
+    }
+  });
+
+  console.log('Known event policies:', policyToEvent.size);
+
+  // Step 2: Get all wallet UTxOs
+  const walletUtxos = await lucid.wallet().getUtxos();
+  console.log('Wallet UTxOs:', walletUtxos.length);
+
+  // Step 3: Extract ticket NFTs (assets matching known event policies)
+  const ticketsInWallet: WalletTicketNft[] = [];
+
+  for (const utxo of walletUtxos) {
+    for (const [unit, qty] of Object.entries(utxo.assets)) {
+      if (unit === 'lovelace' || qty !== 1n) continue;
+
+      // Extract policy ID (first 56 chars) and asset name (rest)
+      const policyId = unit.slice(0, 56);
+      const assetName = unit.slice(56);
+
+      const eventInfo = policyToEvent.get(policyId);
+      if (eventInfo) {
+        ticketsInWallet.push({
+          policyId,
+          assetName,
+          unit,
+          eventId: eventInfo.eventId,
+          eventName: eventInfo.eventName,
+          tierId: eventInfo.tierId,
+          tierName: eventInfo.tierName,
+          priceLovalace: eventInfo.priceLovalace,
+        });
+      }
+    }
+  }
+
+  console.log('Ticket NFTs found in wallet:', ticketsInWallet.length);
+  return ticketsInWallet;
+}
+
+// ============================================
 // WALLET SYNC (DB as Cache Reconciliation)
 // ============================================
 
@@ -1123,6 +1218,8 @@ export interface SyncResult {
   discovered: number;      // New tickets found in wallet, added to DB
   updated: number;         // Existing tickets with ownership updated
   alreadySynced: number;   // Tickets already correctly in DB
+  missingFromWallet: number; // Tickets in DB but not in wallet (marked as transferred)
+  duplicatesRemoved: number; // Duplicate DB records cleaned up
 }
 
 /**
@@ -1141,7 +1238,10 @@ export async function syncWalletTickets(
 ): Promise<SyncResult> {
   console.log('Syncing wallet tickets for:', userAddress);
 
-  const result: SyncResult = { discovered: 0, updated: 0, alreadySynced: 0 };
+  const result: SyncResult = { discovered: 0, updated: 0, alreadySynced: 0, missingFromWallet: 0, duplicatesRemoved: 0 };
+
+  // Step 0: Clean up any duplicate records first
+  result.duplicatesRemoved = await deduplicateTickets();
 
   try {
     // Step 1: Get all known event policies from database
@@ -1269,6 +1369,37 @@ export async function syncWalletTickets(
       }
     }
 
+    // Step 5: Check for tickets in DB that this user supposedly owns but are NOT in wallet
+    // These may have been listed or transferred without proper DB update
+    const ticketAssetNamesInWallet = new Set(ticketsInWallet.map(t => t.assetName));
+
+    const { data: dbTickets, error: dbTicketsError } = await supabase
+      .from('tickets')
+      .select('id, nft_asset_name, status')
+      .eq('current_owner_address', userAddress)
+      .eq('status', 'minted');  // Only check 'minted' status, not 'listed'
+
+    if (!dbTicketsError && dbTickets) {
+      for (const dbTicket of dbTickets) {
+        if (!ticketAssetNamesInWallet.has(dbTicket.nft_asset_name)) {
+          // Ticket is in DB as owned by user but NOT in their wallet
+          console.log('Ticket missing from wallet:', dbTicket.nft_asset_name);
+
+          // Mark as transferred (could have been listed or sent to another wallet)
+          const { error: updateError } = await supabase
+            .from('tickets')
+            .update({ status: 'transferred' })
+            .eq('id', dbTicket.id);
+
+          if (!updateError) {
+            result.missingFromWallet++;
+          } else {
+            console.error('Failed to update missing ticket status:', updateError);
+          }
+        }
+      }
+    }
+
     console.log('Sync complete:', result);
     return result;
 
@@ -1276,6 +1407,64 @@ export async function syncWalletTickets(
     console.error('Wallet sync failed:', err);
     return result;
   }
+}
+
+/**
+ * Deduplicate tickets in the database
+ *
+ * Finds tickets with the same nft_asset_name and keeps only the most recent one.
+ * This cleans up any duplicate entries that may have been created.
+ *
+ * @returns Number of duplicate records removed
+ */
+export async function deduplicateTickets(): Promise<number> {
+  console.log('Checking for duplicate tickets...');
+
+  // Get all tickets grouped by nft_asset_name
+  const { data: allTickets, error } = await supabase
+    .from('tickets')
+    .select('id, nft_asset_name, created_at, status')
+    .order('created_at', { ascending: false });
+
+  if (error || !allTickets) {
+    console.error('Failed to fetch tickets for deduplication:', error);
+    return 0;
+  }
+
+  // Group by nft_asset_name
+  const ticketsByAssetName = new Map<string, typeof allTickets>();
+  for (const ticket of allTickets) {
+    const existing = ticketsByAssetName.get(ticket.nft_asset_name) || [];
+    existing.push(ticket);
+    ticketsByAssetName.set(ticket.nft_asset_name, existing);
+  }
+
+  let duplicatesRemoved = 0;
+
+  // For each asset name with more than 1 record, keep the newest and delete the rest
+  for (const [assetName, tickets] of ticketsByAssetName.entries()) {
+    if (tickets.length > 1) {
+      console.log(`Found ${tickets.length} duplicates for ${assetName}`);
+
+      // Keep the first one (newest due to order), delete the rest
+      const toDelete = tickets.slice(1).map(t => t.id);
+
+      const { error: deleteError } = await supabase
+        .from('tickets')
+        .delete()
+        .in('id', toDelete);
+
+      if (deleteError) {
+        console.error('Failed to delete duplicates:', deleteError);
+      } else {
+        duplicatesRemoved += toDelete.length;
+        console.log(`  Removed ${toDelete.length} duplicate(s)`);
+      }
+    }
+  }
+
+  console.log(`Deduplication complete: ${duplicatesRemoved} duplicates removed`);
+  return duplicatesRemoved;
 }
 
 /**

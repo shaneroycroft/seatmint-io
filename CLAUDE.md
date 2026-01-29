@@ -59,9 +59,9 @@ aiken docs           # Generate HTML documentation
 - `src/services/ticketService.ts` - All blockchain interactions (create event, purchase, list, resale, wallet sync)
 - `src/services/transactionBuilder.ts` - Lower-level transaction building utilities
 - `src/utils/plutusScripts.ts` - Validator loading and parameter application
-- `src/hooks/useLucid.ts` - Wallet connection hook (Nami, Eternl, Lace, etc.)
+- `src/hooks/useLucid.ts` - Wallet connection hook with change detection (Nami, Eternl, Lace, etc.)
 - `src/hooks/useGenesis.ts` - Platform initialization hook
-- `src/constants.ts` - Brand config and organizer authorization
+- `src/constants.ts` - Brand config
 - `src/components/SeatVisualizer.tsx` - Three.js 3D venue designer
 - `contracts/validators/types.ak` - Aiken type definitions (source of truth for datum/redeemer schemas)
 - `contracts/lib/seatmint/types.ak` - Shared library types
@@ -72,7 +72,15 @@ The app uses internal tab-based navigation (not react-router). Tabs are defined 
 - **Primary tabs**: Setup, Events, My Tickets (all users)
 - **Secondary tabs** (organizer-only): Organizer, Venue, Settings
 
-Tab visibility is controlled by `isOrganizer` from `constants.ts`. In dev mode (empty `AUTHORIZED_ORGANIZERS` array), all users see organizer tabs.
+Tab visibility is controlled by `checkOrganizerAccess()` which checks if the wallet contains the Settings NFT. Only the wallet holding the Settings NFT sees organizer tabs.
+
+### Wallet Change Detection
+
+The `useLucid` hook polls for wallet address changes every 2 seconds. When detected:
+- `walletChanged` flag is set to `true`
+- App redirects to Setup tab
+- Organizer status is reset and rechecked
+- Toast notification informs user
 
 ### Type Definitions Alignment
 
@@ -212,16 +220,22 @@ const saleUTxO = saleUTxOs.find(utxo => {
 The database is a cache; on-chain state is the source of truth. Use `syncWalletTickets()` to reconcile:
 
 ```typescript
-import { syncWalletTickets } from './services/ticketService';
+import { syncWalletTickets, deduplicateTickets } from './services/ticketService';
 const result = await syncWalletTickets(lucid, userAddress);
-// result: { discovered: 2, updated: 1, alreadySynced: 5 }
+// result: { discovered: 2, updated: 1, alreadySynced: 5, missingFromWallet: 1, duplicatesRemoved: 0 }
 ```
 
 **Behavior**:
+- First runs deduplication to remove duplicate ticket records (same `nft_asset_name`)
 - Scans wallet UTxOs for NFTs matching known event policy IDs
 - Creates DB records for tickets found in wallet but not in DB (discovered)
 - Updates ownership for tickets transferred to this wallet (updated)
-- Does NOT remove tickets from DB if not in wallet (could be listed elsewhere)
+- Marks tickets in DB that are NOT in wallet as 'transferred' (missingFromWallet)
+
+**Ticket Status Flow**:
+- `minted` → User owns ticket, it's in their wallet
+- `listed` → Ticket is on storefront for resale (set by `listTicketForResale`)
+- `transferred` → Ticket left wallet without proper DB update (caught by sync)
 
 **When to sync**: Auto-syncs on TicketMarketplace load; manual sync button available.
 
@@ -236,7 +250,8 @@ Located at `src/components/SeatVisualizer.tsx`. Organizer-only tool for designin
 - Instanced meshes for performance with large seat counts
 
 **Integration notes**:
-- Requires parent container with explicit height (`h-full w-full` wrapper in App.tsx)
+- Requires parent container with explicit height: `style={{ height: 'calc(100vh - 4rem)' }}` (accounting for header)
+- Component has retry logic for 0-dimension container (waits for layout to complete)
 - Uses WebGL; check for browser support if rendering issues occur
 - Currently standalone; future work to connect seat metadata with ticket NFTs
 

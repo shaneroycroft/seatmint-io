@@ -205,6 +205,17 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
   useEffect(() => {
     if (!containerRef.current) return;
 
+    // Wait for container to have dimensions
+    const { clientWidth, clientHeight } = containerRef.current;
+    if (clientWidth === 0 || clientHeight === 0) {
+      console.warn('SeatVisualizer: Container has 0 dimensions, waiting for layout...');
+      const retryTimeout = setTimeout(() => {
+        // Force re-render to retry initialization
+        setTiers(prev => [...prev]);
+      }, 100);
+      return () => clearTimeout(retryTimeout);
+    }
+
     // Scene
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xf1f5f9);

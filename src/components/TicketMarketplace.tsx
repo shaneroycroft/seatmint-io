@@ -6,6 +6,7 @@ import {
   cancelStorefrontListing,
   transferTicket,
   syncWalletTickets,
+  getWalletTicketNfts,
 } from '../services/ticketService';
 import { useToast, TOAST_MESSAGES } from '../contexts/ToastContext';
 
@@ -86,13 +87,24 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
       const result = await syncWalletTickets(lucid, userAddress);
       setLastSyncResult({ discovered: result.discovered, updated: result.updated });
 
-      if (result.discovered > 0 || result.updated > 0) {
-        toast.success(
-          'Wallet Synced',
-          `Found ${result.discovered} new ticket(s), updated ${result.updated} record(s)`
-        );
+      const hasChanges = result.discovered > 0 || result.updated > 0 || result.missingFromWallet > 0 || result.duplicatesRemoved > 0;
+
+      if (hasChanges) {
         // Reload data after sync
         await loadDataInternal();
+
+        // Build appropriate message
+        const parts: string[] = [];
+        if (result.duplicatesRemoved > 0) parts.push(`${result.duplicatesRemoved} duplicate(s) cleaned up`);
+        if (result.discovered > 0) parts.push(`${result.discovered} new ticket(s) found`);
+        if (result.updated > 0) parts.push(`${result.updated} ownership updated`);
+        if (result.missingFromWallet > 0) parts.push(`${result.missingFromWallet} ticket(s) no longer in wallet`);
+
+        if (result.missingFromWallet > 0) {
+          toast.info('Wallet Synced', parts.join(', ') + '. Tickets not in your wallet have been marked as transferred.');
+        } else {
+          toast.success('Wallet Synced', parts.join(', '));
+        }
       } else {
         toast.success('Wallet Synced', 'Your tickets are already up to date');
       }
@@ -112,9 +124,16 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
     if (lucid) {
       try {
         const syncResult = await syncWalletTickets(lucid, userAddress);
-        if (syncResult.discovered > 0 || syncResult.updated > 0) {
+        const hasChanges = syncResult.discovered > 0 || syncResult.updated > 0 || syncResult.missingFromWallet > 0 || syncResult.duplicatesRemoved > 0;
+        if (hasChanges) {
           console.log('Auto-sync found changes:', syncResult);
           setLastSyncResult({ discovered: syncResult.discovered, updated: syncResult.updated });
+          if (syncResult.duplicatesRemoved > 0) {
+            console.log(`Auto-sync: ${syncResult.duplicatesRemoved} duplicate(s) cleaned up`);
+          }
+          if (syncResult.missingFromWallet > 0) {
+            console.log(`Auto-sync: ${syncResult.missingFromWallet} ticket(s) marked as transferred (not in wallet)`);
+          }
         }
       } catch (syncErr) {
         console.warn('Auto-sync failed:', syncErr);
@@ -126,6 +145,7 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
 
   const loadDataInternal = async () => {
     try {
+      // Load marketplace listings (tickets listed by others)
       const { data: listingsData, error: listingsError } = await supabase
         .from('tickets')
         .select(`
@@ -140,38 +160,82 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
         console.error('Listings query failed:', listingsError);
       }
 
-      const { data: myTicketsData, error: myTicketsError } = await supabase
-        .from('tickets')
-        .select(`
-          *,
-          events (event_name, event_date, venue_name, event_policy_id),
-          ticket_tiers (tier_name, price_lovelace)
-        `)
-        .eq('current_owner_address', userAddress);
-
-      if (myTicketsError) {
-        console.error('My tickets query failed:', myTicketsError);
-      }
-
       console.log('TicketMarketplace: Found', listingsData?.length || 0, 'listings');
-      console.log('TicketMarketplace: Found', myTicketsData?.length || 0, 'owned tickets');
-
-      // Debug: If no owned tickets, check if any tickets exist at all
-      if (!myTicketsData || myTicketsData.length === 0) {
-        const { data: allTickets } = await supabase
-          .from('tickets')
-          .select('id, current_owner_address, status')
-          .limit(10);
-
-        console.log('TicketMarketplace DEBUG: Sample tickets in database:');
-        allTickets?.forEach(t => {
-          console.log(`  Ticket ${t.id}: owner=${t.current_owner_address?.slice(0,30)}... status=${t.status}`);
-          console.log(`    Address match: ${t.current_owner_address === userAddress}`);
-        });
-      }
-
       setListings(formatTickets(listingsData || []));
-      setMyTickets(formatTickets(myTicketsData || []));
+
+      // WALLET-FIRST APPROACH for "My Tickets"
+      // Only show tickets that are actually in the user's wallet
+      if (lucid) {
+        const walletNfts = await getWalletTicketNfts(lucid);
+        console.log('TicketMarketplace: Wallet contains', walletNfts.length, 'ticket NFTs');
+
+        if (walletNfts.length > 0) {
+          // Get the asset names of tickets in wallet
+          const walletAssetNames = walletNfts.map(nft => nft.assetName);
+
+          // Query DB only for tickets that are actually in the wallet
+          const { data: myTicketsData, error: myTicketsError } = await supabase
+            .from('tickets')
+            .select(`
+              *,
+              events (event_name, event_date, venue_name, event_policy_id),
+              ticket_tiers (tier_name, price_lovelace)
+            `)
+            .in('nft_asset_name', walletAssetNames);
+
+          if (myTicketsError) {
+            console.error('My tickets query failed:', myTicketsError);
+          }
+
+          console.log('TicketMarketplace: Found', myTicketsData?.length || 0, 'matching DB records');
+
+          // If some wallet tickets don't have DB records, create display entries from wallet data
+          const dbAssetNames = new Set((myTicketsData || []).map((t: any) => t.nft_asset_name));
+          const missingFromDb = walletNfts.filter(nft => !dbAssetNames.has(nft.assetName));
+
+          if (missingFromDb.length > 0) {
+            console.log('TicketMarketplace: Creating display entries for', missingFromDb.length, 'tickets not in DB');
+          }
+
+          // Format tickets from DB
+          const formattedFromDb = formatTickets(myTicketsData || []);
+
+          // Create display entries for wallet tickets not in DB
+          const formattedFromWallet = missingFromDb.map((nft, index) => ({
+            id: `wallet-${nft.assetName}`,
+            event_id: nft.eventId,
+            event_name: nft.eventName,
+            tier_name: nft.tierName,
+            ticket_number: index + 1, // Placeholder number
+            current_owner: userAddress,
+            original_price: nft.priceLovalace / 1_000_000,
+            resale_price: null,
+            is_listed: false,
+            event_date: '', // Not available from wallet scan
+            venue: '',
+            nft_asset_name: nft.assetName,
+            listing_utxo_ref: null,
+            event_policy_id: nft.policyId,
+          }));
+
+          setMyTickets([...formattedFromDb, ...formattedFromWallet]);
+        } else {
+          // No tickets in wallet
+          setMyTickets([]);
+        }
+      } else {
+        // No lucid instance, fall back to DB query (shouldn't happen normally)
+        const { data: myTicketsData } = await supabase
+          .from('tickets')
+          .select(`
+            *,
+            events (event_name, event_date, venue_name, event_policy_id),
+            ticket_tiers (tier_name, price_lovelace)
+          `)
+          .eq('current_owner_address', userAddress);
+
+        setMyTickets(formatTickets(myTicketsData || []));
+      }
     } catch (err) {
       console.error('Failed to load data:', err);
     } finally {
