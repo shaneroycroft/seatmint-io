@@ -25,12 +25,12 @@ interface ResaleProps {
 
 // Color scheme based on tier type
 const TIER_COLORS: Record<string, string> = {
-  vip: 'bg-purple-600',
-  backstage: 'bg-red-600',
-  premium: 'bg-amber-600',
-  general: 'bg-blue-600',
-  standard: 'bg-slate-600',
-  default: 'bg-emerald-600',
+  vip: 'bg-sand-600',
+  backstage: 'bg-terracotta-600',
+  premium: 'bg-sand-500',
+  general: 'bg-forest-600',
+  standard: 'bg-warm-600',
+  default: 'bg-forest-600',
 };
 
 const getTierColor = (tierName: string): string => {
@@ -302,8 +302,8 @@ export const Resale: React.FC<ResaleProps> = ({ lucid, userAddress }) => {
 
             {/* Seller Info */}
             <div className="bg-white p-4 rounded-xl mb-6">
-              <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Seller</p>
-              <p className="text-sm font-mono text-slate-600 truncate">
+              <p className="text-xs text-warm-400 uppercase tracking-wider mb-1">Seller</p>
+              <p className="text-sm font-mono text-warm-600 truncate">
                 {selectedListing.seller_address.slice(0, 20)}...{selectedListing.seller_address.slice(-8)}
               </p>
             </div>
@@ -312,7 +312,7 @@ export const Resale: React.FC<ResaleProps> = ({ lucid, userAddress }) => {
             <button
               onClick={handlePurchase}
               disabled={isPurchasing}
-              className="w-full bg-orange-600 text-white py-6 rounded-2xl font-black text-lg shadow-xl hover:bg-orange-700 transition-all disabled:opacity-50 flex items-center justify-center gap-3"
+              className="w-full bg-terracotta-600 text-white py-6 rounded-2xl font-black text-lg shadow-xl hover:bg-terracotta-700 transition-all disabled:opacity-50 flex items-center justify-center gap-3"
             >
               {isPurchasing ? (
                 <>
@@ -345,7 +345,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isSelected, onClick 
     <div
       onClick={onClick}
       className={`bg-white p-6 flex flex-col cursor-pointer transition-all duration-300 hover:z-20 hover:shadow-2xl ${
-        isSelected ? 'ring-2 ring-orange-600 z-10' : ''
+        isSelected ? 'ring-2 ring-terracotta-600 z-10' : ''
       }`}
     >
       {/* Ticket Visual */}
@@ -359,7 +359,7 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isSelected, onClick 
           <div className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest italic">
             {listing.tier_name}
           </div>
-          <div className={`px-2 py-1 rounded text-[9px] font-bold ${priceChange > 0 ? 'bg-red-500' : 'bg-green-500'}`}>
+          <div className={`px-2 py-1 rounded text-[9px] font-bold ${priceChange > 0 ? 'bg-terracotta-500' : 'bg-forest-500'}`}>
             {priceChange > 0 ? '+' : ''}{priceChange.toFixed(0)}%
           </div>
         </div>
@@ -373,19 +373,19 @@ const ListingCard: React.FC<ListingCardProps> = ({ listing, isSelected, onClick 
       {/* Details Below Card */}
       <div className="flex justify-between items-end">
         <div>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+          <p className="text-[10px] font-bold text-warm-400 uppercase tracking-widest mb-1">
             {new Date(listing.event_date).toLocaleDateString('en-US', {
               month: 'short',
               day: 'numeric',
               year: 'numeric'
             })}
           </p>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-warm-500">
             <span className="line-through">₳{listing.original_price}</span>
           </p>
         </div>
         <div className="text-right">
-          <p className="text-2xl font-black text-slate-900 tracking-tighter">
+          <p className="text-2xl font-black text-warm-900 tracking-tighter">
             ₳{listing.resale_price}
           </p>
         </div>

@@ -45,24 +45,24 @@ const ICONS: Record<ToastType, React.ReactNode> = {
 
 const STYLES: Record<ToastType, { bg: string; icon: string; border: string }> = {
   success: {
-    bg: 'bg-green-50',
-    icon: 'bg-green-500 text-white',
-    border: 'border-green-200',
+    bg: 'bg-forest-50',
+    icon: 'bg-forest-500 text-white',
+    border: 'border-forest-200',
   },
   error: {
-    bg: 'bg-red-50',
-    icon: 'bg-red-500 text-white',
-    border: 'border-red-200',
+    bg: 'bg-terracotta-50',
+    icon: 'bg-terracotta-500 text-white',
+    border: 'border-terracotta-200',
   },
   info: {
-    bg: 'bg-blue-50',
-    icon: 'bg-blue-500 text-white',
-    border: 'border-blue-200',
+    bg: 'bg-forest-50',
+    icon: 'bg-forest-600 text-white',
+    border: 'border-forest-200',
   },
   pending: {
-    bg: 'bg-amber-50',
-    icon: 'bg-amber-500 text-white',
-    border: 'border-amber-200',
+    bg: 'bg-sand-50',
+    icon: 'bg-sand-500 text-white',
+    border: 'border-sand-200',
   },
 };
 
@@ -113,14 +113,14 @@ export const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
 
         {/* Content */}
         <div className="flex-1 min-w-0 pt-0.5">
-          <p className="font-bold text-slate-900 text-sm">{toast.title}</p>
+          <p className="font-bold text-warm-900 text-sm">{toast.title}</p>
           {toast.message && (
-            <p className="text-slate-600 text-sm mt-0.5 leading-relaxed">{toast.message}</p>
+            <p className="text-warm-600 text-sm mt-0.5 leading-relaxed">{toast.message}</p>
           )}
           {toast.action && (
             <button
               onClick={toast.action.onClick}
-              className="mt-2 text-sm font-semibold text-blue-600 hover:text-blue-700"
+              className="mt-2 text-sm font-semibold text-forest-600 hover:text-forest-700"
             >
               {toast.action.label}
             </button>
@@ -131,7 +131,7 @@ export const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
         {toast.type !== 'pending' && (
           <button
             onClick={handleDismiss}
-            className="text-slate-400 hover:text-slate-600 transition-colors p-1 -mr-1 -mt-1"
+            className="text-warm-400 hover:text-warm-600 transition-colors p-1 -mr-1 -mt-1"
             aria-label="Dismiss"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -143,13 +143,13 @@ export const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
 
       {/* Progress bar for timed toasts */}
       {toast.duration && toast.duration > 0 && (
-        <div className="h-1 bg-slate-200/50">
+        <div className="h-1 bg-warm-200/50">
           <div
             className={`h-full transition-all duration-100 ease-linear ${
-              toast.type === 'success' ? 'bg-green-400' :
-              toast.type === 'error' ? 'bg-red-400' :
-              toast.type === 'info' ? 'bg-blue-400' :
-              'bg-amber-400'
+              toast.type === 'success' ? 'bg-forest-400' :
+              toast.type === 'error' ? 'bg-terracotta-400' :
+              toast.type === 'info' ? 'bg-forest-400' :
+              'bg-sand-400'
             }`}
             style={{ width: `${progress}%` }}
           />

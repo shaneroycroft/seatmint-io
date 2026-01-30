@@ -2,13 +2,13 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import {
   listTicketForResale,
-  purchaseFromStorefront,
   cancelStorefrontListing,
   transferTicket,
   syncWalletTickets,
   getWalletTicketNfts,
 } from '../services/ticketService';
 import { useToast, TOAST_MESSAGES } from '../contexts/ToastContext';
+import { TicketPreview } from './TicketPreview';
 
 interface Ticket {
   id: string;
@@ -22,6 +22,7 @@ interface Ticket {
   is_listed: boolean;
   event_date: string;
   venue: string;
+  venue_address: string;
   nft_asset_name: string;
   listing_utxo_ref: string | null;
   event_policy_id: string;
@@ -34,12 +35,12 @@ interface MarketplaceProps {
 
 // Color scheme based on tier type
 const TIER_COLORS: Record<string, string> = {
-  vip: 'bg-purple-600',
-  backstage: 'bg-red-600',
-  premium: 'bg-red-600',
-  general: 'bg-blue-600',
-  standard: 'bg-blue-600',
-  default: 'bg-emerald-600',
+  vip: 'bg-terracotta-600',
+  backstage: 'bg-terracotta-600',
+  premium: 'bg-terracotta-600',
+  general: 'bg-forest-600',
+  standard: 'bg-forest-600',
+  default: 'bg-forest-600',
 };
 
 const getTierColor = (tierName: string): string => {
@@ -51,12 +52,9 @@ const getTierColor = (tierName: string): string => {
 };
 
 export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddress }) => {
-  const [listings, setListings] = useState<Ticket[]>([]);
   const [myTickets, setMyTickets] = useState<Ticket[]>([]);
-  const [activeTab, setActiveTab] = useState<'browse' | 'my-tickets'>('browse');
   const [loading, setLoading] = useState(true);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
-  const [isPurchasing, setIsPurchasing] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [_lastSyncResult, setLastSyncResult] = useState<{ discovered: number; updated: number } | null>(null);
@@ -153,24 +151,6 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
 
   const loadDataInternal = async () => {
     try {
-      // Load marketplace listings (tickets listed by others)
-      const { data: listingsData, error: listingsError } = await supabase
-        .from('tickets')
-        .select(`
-          *,
-          events (event_name, event_date, venue_name, event_policy_id),
-          ticket_tiers (tier_name, price_lovelace)
-        `)
-        .eq('status', 'listed')
-        .neq('current_owner_address', userAddress);
-
-      if (listingsError) {
-        console.error('Listings query failed:', listingsError);
-      }
-
-      console.log('TicketMarketplace: Found', listingsData?.length || 0, 'listings');
-      setListings(formatTickets(listingsData || []));
-
       // WALLET-FIRST APPROACH for "My Tickets"
       // Show tickets in wallet + user's listed tickets (at storefront contract)
       if (lucid) {
@@ -182,7 +162,7 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
           .from('tickets')
           .select(`
             *,
-            events (event_name, event_date, venue_name, event_policy_id),
+            events (event_name, event_date, venue_name, event_location, event_policy_id),
             ticket_tiers (tier_name, price_lovelace)
           `)
           .eq('status', 'listed')
@@ -209,7 +189,7 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
             .from('tickets')
             .select(`
               *,
-              events (event_name, event_date, venue_name, event_policy_id),
+              events (event_name, event_date, venue_name, event_location, event_policy_id),
               ticket_tiers (tier_name, price_lovelace)
             `)
             .in('nft_asset_name', walletAssetNames);
@@ -244,6 +224,7 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
             is_listed: false,
             event_date: '', // Not available from wallet scan
             venue: '',
+            venue_address: '', // Not available from wallet scan
             nft_asset_name: nft.assetName,
             listing_utxo_ref: null,
             event_policy_id: nft.policyId,
@@ -264,7 +245,7 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
           .from('tickets')
           .select(`
             *,
-            events (event_name, event_date, venue_name, event_policy_id),
+            events (event_name, event_date, venue_name, event_location, event_policy_id),
             ticket_tiers (tier_name, price_lovelace)
           `)
           .eq('current_owner_address', userAddress);
@@ -291,6 +272,7 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
       is_listed: ticket.status === 'listed',
       event_date: ticket.events?.event_date || '',
       venue: ticket.events?.venue_name || '',
+      venue_address: ticket.events?.event_location || '',
       nft_asset_name: ticket.nft_asset_name || '',
       listing_utxo_ref: ticket.listing_utxo_ref || null,
       event_policy_id: ticket.events?.event_policy_id || '',
@@ -373,39 +355,6 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
     }
   };
 
-  const handlePurchaseTicket = async (ticket: Ticket) => {
-    if (!ticket.resale_price || !ticket.listing_utxo_ref) return;
-
-    setIsPurchasing(true);
-    const pendingToastId = toast.pending(
-      TOAST_MESSAGES.purchaseStarted.title,
-      TOAST_MESSAGES.purchaseStarted.message
-    );
-
-    try {
-      await purchaseFromStorefront(lucid, {
-        listingUtxoRef: ticket.listing_utxo_ref,
-        eventId: ticket.event_id,
-      });
-      toast.dismissToast(pendingToastId);
-      toast.success(
-        TOAST_MESSAGES.purchaseSuccess.title,
-        `Your ticket for ${ticket.event_name} is on its way! Check My Tickets shortly.`
-      );
-      setSelectedTicket(null);
-      loadData();
-    } catch (err) {
-      console.error(err);
-      toast.dismissToast(pendingToastId);
-      toast.error(
-        TOAST_MESSAGES.purchaseFailed.title,
-        getFriendlyErrorMessage(err, 'We couldn\'t complete your purchase. Please try again.')
-      );
-    } finally {
-      setIsPurchasing(false);
-    }
-  };
-
   const handleTransferTicket = async (ticket: Ticket, recipientAddress: string) => {
     setIsProcessing(true);
     const pendingToastId = toast.pending(
@@ -440,197 +389,163 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
-        <div className="text-slate-500">Loading marketplace...</div>
+        <div className="text-warm-500">Loading marketplace...</div>
       </div>
     );
   }
 
-  const displayTickets = activeTab === 'browse' ? listings : myTickets;
-
   return (
     <div className="h-full flex flex-col lg:flex-row bg-white">
       {/* Main Content */}
-      <div className="flex-1 overflow-y-auto border-r border-slate-100">
+      <div className="flex-1 overflow-y-auto border-r border-warm-100">
         {/* Header */}
-        <div className="p-8 border-b sticky top-0 bg-white/90 backdrop-blur-md z-10 flex justify-between items-end">
+        <div className="px-6 py-4 border-b sticky top-0 bg-white/95 backdrop-blur-sm z-10 flex justify-between items-center">
           <div>
-            <p className="text-blue-600 font-bold text-xs uppercase tracking-[0.2em] mb-1">
-              {activeTab === 'browse' ? 'Live Marketplace' : 'Your Collection'}
+            <h2 className="text-lg font-semibold text-warm-900">My Tickets</h2>
+            <p className="text-xs text-warm-500">
+              {myTickets.length} ticket{myTickets.length !== 1 ? 's' : ''} in your collection
             </p>
-            <h2 className="text-3xl font-black text-slate-900 tracking-tight">
-              {activeTab === 'browse' ? 'Available Tickets' : 'My Tickets'}
-            </h2>
           </div>
 
-          {/* Tab Switcher and Sync */}
-          <div className="flex gap-2 items-center">
-            <button
-              onClick={() => setActiveTab('browse')}
-              className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all ${
-                activeTab === 'browse'
-                  ? 'bg-slate-900 text-white'
-                  : 'text-slate-500 hover:bg-slate-100'
-              }`}
-            >
-              Browse ({listings.length})
-            </button>
-            <button
-              onClick={() => setActiveTab('my-tickets')}
-              className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all ${
-                activeTab === 'my-tickets'
-                  ? 'bg-slate-900 text-white'
-                  : 'text-slate-500 hover:bg-slate-100'
-              }`}
-            >
-              My Tickets ({myTickets.length})
-            </button>
-            <button
-              onClick={handleSync}
-              disabled={isSyncing || !lucid}
-              className="px-3 py-2 rounded-lg text-sm font-medium text-blue-600 hover:bg-blue-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-              title="Sync wallet with database"
-            >
-              <svg className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              {isSyncing ? 'Syncing...' : 'Sync'}
-            </button>
-          </div>
+          {/* Sync Button */}
+          <button
+            onClick={handleSync}
+            disabled={isSyncing || !lucid}
+            className="px-4 py-2 rounded-lg text-sm font-medium text-forest-600 hover:bg-forest-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            title="Sync wallet with database"
+          >
+            <svg className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {isSyncing ? 'Syncing...' : 'Sync Wallet'}
+          </button>
         </div>
 
         {/* Ticket Grid */}
-        {displayTickets.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-16">
-            <div className="border-4 border-dashed border-slate-200 rounded-[32px] p-10 bg-white/50">
-              <h4 className="text-lg font-bold text-slate-800 mb-2">
-                {activeTab === 'browse' ? 'No tickets available' : 'No tickets yet'}
-              </h4>
-              <p className="text-slate-400 text-sm">
-                {activeTab === 'browse'
-                  ? 'Check back later for new listings'
-                  : 'Purchase tickets from events to see them here'}
+        {myTickets.length === 0 ? (
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-10">
+            <div className="border-2 border-dashed border-warm-200 rounded-xl p-8 bg-white/50">
+              <h4 className="text-sm font-semibold text-warm-700 mb-1">No tickets yet</h4>
+              <p className="text-warm-400 text-xs">
+                Purchase tickets from the Events page to see them here
               </p>
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-slate-100">
-            {displayTickets.map((ticket) => (
-              <TicketCard
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+            {myTickets.map((ticket) => (
+              <div
                 key={ticket.id}
-                ticket={ticket}
-                isSelected={selectedTicket?.id === ticket.id}
                 onClick={() => setSelectedTicket(ticket)}
-                mode={activeTab}
-                onList={(price) => handleListTicketForSale(ticket, price)}
-                onCancel={() => handleCancelListing(ticket)}
-                onTransfer={(addr) => handleTransferTicket(ticket, addr)}
-              />
+                className={`cursor-pointer transition-all ${
+                  selectedTicket?.id === ticket.id ? 'ring-2 ring-forest-500 rounded-2xl' : ''
+                }`}
+              >
+                <TicketPreview
+                  eventName={ticket.event_name}
+                  venue={ticket.venue}
+                  venueAddress={ticket.venue_address}
+                  eventDate={ticket.event_date}
+                  tierName={ticket.tier_name}
+                  priceAda={ticket.resale_price || ticket.original_price}
+                  ticketId={`${ticket.nft_asset_name?.slice(0, 8) || ticket.id.slice(0, 8)}`}
+                  interactive={true}
+                  qrCycleSeconds={30}
+                />
+                {ticket.is_listed && (
+                  <div className="mt-2 text-center">
+                    <span className="bg-sand-100 text-sand-700 px-3 py-1 rounded-full text-xs font-semibold">
+                      Listed for ₳{ticket.resale_price}
+                    </span>
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* Sidebar - Order Summary */}
-      <aside className="w-full lg:w-[400px] bg-slate-50 p-8 flex flex-col shrink-0">
-        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 mb-8">
-          Order Summary
+      {/* Sidebar - Ticket Details */}
+      <aside className="w-full lg:w-[340px] bg-warm-50 p-5 flex flex-col shrink-0 border-l border-warm-200">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-warm-400 mb-4">
+          Ticket Details
         </h3>
 
         {!selectedTicket ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-center border-4 border-dashed border-slate-200 rounded-[32px] p-10 bg-white/50">
-            <h4 className="text-lg font-bold text-slate-800 mb-2">Select a ticket</h4>
-            <p className="text-slate-400 text-sm">
-              Review contract details and finalize purchase.
+          <div className="flex-1 flex flex-col items-center justify-center text-center border-2 border-dashed border-warm-200 rounded-xl p-6 bg-white/50">
+            <p className="text-sm font-medium text-warm-600 mb-1">Select a ticket</p>
+            <p className="text-warm-400 text-xs">
+              Click a ticket to view details
             </p>
           </div>
         ) : (
           <div className="flex-1 flex flex-col">
             {/* Selected Ticket Card */}
-            <div className="bg-white p-8 rounded-[32px] shadow-xl border border-white mb-6 relative overflow-hidden">
-              <div className={`absolute top-0 left-0 w-2 h-full ${getTierColor(selectedTicket.tier_name)}`} />
+            <div className="bg-white p-5 rounded-xl shadow-sm border border-warm-200 mb-4 relative overflow-hidden">
+              <div className={`absolute top-0 left-0 w-1 h-full ${getTierColor(selectedTicket.tier_name)}`} />
 
-              <div className="flex justify-between items-start mb-6">
-                <h4 className="font-black text-2xl text-slate-900 leading-tight pr-4">
+              <div className="flex justify-between items-start mb-3">
+                <h4 className="font-semibold text-base text-warm-900 leading-tight pr-3">
                   {selectedTicket.event_name}
                 </h4>
                 <button
                   onClick={() => setSelectedTicket(null)}
-                  className="text-slate-400 hover:text-slate-900 text-xl"
+                  className="text-warm-400 hover:text-warm-600 text-lg leading-none"
                 >
                   ×
                 </button>
               </div>
 
-              <div className="space-y-2 text-sm text-slate-500 mb-6">
-                <p>{selectedTicket.venue}</p>
-                <p>{new Date(selectedTicket.event_date).toLocaleDateString()}</p>
-                <p className="font-semibold text-slate-700">{selectedTicket.tier_name}</p>
+              <div className="space-y-1 text-xs text-warm-500 mb-4">
+                {selectedTicket.venue && <p>{selectedTicket.venue}</p>}
+                {selectedTicket.event_date && <p>{new Date(selectedTicket.event_date).toLocaleDateString()}</p>}
+                <p className="font-medium text-warm-700">{selectedTicket.tier_name} • #{selectedTicket.ticket_number}</p>
               </div>
 
               {selectedTicket.resale_price && purchaseBreakdown && (
                 <>
-                  <div className="space-y-4 py-6 border-t border-slate-50">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-500">Price</span>
-                      <span className="font-mono font-bold text-slate-900">
-                        ₳{purchaseBreakdown.subtotal}
-                      </span>
+                  <div className="space-y-2 py-3 border-t border-warm-100">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-warm-500">Price</span>
+                      <span className="font-medium text-warm-900">₳{purchaseBreakdown.subtotal}</span>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-500">Fee ({platformFeePercent}%)</span>
-                      <span className="font-mono font-bold text-slate-900">
-                        ₳{purchaseBreakdown.fee.toFixed(2)}
-                      </span>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-warm-500">Fee ({platformFeePercent}%)</span>
+                      <span className="font-medium text-warm-900">₳{purchaseBreakdown.fee.toFixed(2)}</span>
                     </div>
                   </div>
-
-                  <div className="pt-6 border-t-2 border-dashed border-slate-100 flex justify-between items-end">
-                    <span className="text-xs font-black uppercase text-slate-400 tracking-widest">Total</span>
-                    <span className="text-4xl font-black text-slate-900 tracking-tighter">
-                      ₳{purchaseBreakdown.total.toFixed(2)}
-                    </span>
+                  <div className="pt-3 border-t border-dashed border-warm-200 flex justify-between items-center">
+                    <span className="text-xs font-medium text-warm-500">Total</span>
+                    <span className="text-xl font-semibold text-warm-900">₳{purchaseBreakdown.total.toFixed(2)}</span>
                   </div>
                 </>
               )}
             </div>
 
-            {/* Buy Button */}
-            {activeTab === 'browse' && selectedTicket.resale_price && (
-              <button
-                onClick={() => handlePurchaseTicket(selectedTicket)}
-                disabled={isPurchasing}
-                className="w-full bg-slate-900 text-white py-6 rounded-2xl font-black text-lg shadow-xl hover:bg-black transition-all disabled:opacity-50 flex items-center justify-center gap-3"
-              >
-                {isPurchasing ? 'Signing...' : 'Confirm & Buy Ticket'}
-              </button>
-            )}
-
-            {/* My Tickets Actions */}
-            {activeTab === 'my-tickets' && (
-              <div className="space-y-3">
+            {/* Ticket Actions */}
+            {(
+              <div className="space-y-2">
                 {selectedTicket.is_listed ? (
                   <>
-                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-2">
-                      <p className="text-blue-800 font-semibold text-sm">Listed for Sale</p>
-                      <p className="text-blue-600 text-2xl font-black">₳{selectedTicket.resale_price}</p>
+                    <div className="bg-forest-50 border border-forest-100 rounded-lg p-3 mb-2">
+                      <p className="text-forest-700 text-xs font-medium">Listed for Sale</p>
+                      <p className="text-forest-800 text-lg font-semibold">₳{selectedTicket.resale_price}</p>
                     </div>
                     <button
                       onClick={() => handleCancelListing(selectedTicket)}
                       disabled={isProcessing}
-                      className="w-full bg-red-500 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-red-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full bg-terracotta-500 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-terracotta-600 transition-all disabled:opacity-50"
                     >
                       {isProcessing ? 'Processing...' : 'Cancel Listing'}
                     </button>
                   </>
                 ) : isListingMode ? (
-                  /* Listing Price Flyout */
-                  <div className="space-y-4">
+                  /* Listing Price Input */
+                  <div className="space-y-3">
                     <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">
-                        Set Your Price
-                      </label>
+                      <label className="block text-xs font-medium text-warm-600 mb-1.5">Set Your Price</label>
                       <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₳</span>
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-warm-400 text-sm">₳</span>
                         <input
                           type="number"
                           min="1"
@@ -638,11 +553,11 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
                           value={listingPrice}
                           onChange={(e) => setListingPrice(e.target.value)}
                           placeholder="0.00"
-                          className="w-full pl-10 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-xl text-2xl font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full pl-8 pr-3 py-2.5 bg-warm-50 border border-warm-200 rounded-lg text-lg font-semibold text-warm-900 focus:outline-none focus:ring-2 focus:ring-forest-500"
                           autoFocus
                         />
                       </div>
-                      <p className="text-xs text-slate-400 mt-2">
+                      <p className="text-[11px] text-warm-400 mt-1.5">
                         Max: ₳{(selectedTicket.original_price * 3).toFixed(2)} (3x original)
                       </p>
                     </div>
@@ -657,7 +572,7 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
                         }
                       }}
                       disabled={isProcessing || !listingPrice || parseFloat(listingPrice) <= 0}
-                      className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full bg-forest-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-forest-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isProcessing ? 'Processing...' : 'Confirm Listing'}
                     </button>
@@ -666,7 +581,7 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
                         setIsListingMode(false);
                         setListingPrice('');
                       }}
-                      className="w-full bg-slate-200 text-slate-700 py-3 rounded-xl font-medium hover:bg-slate-300 transition-all"
+                      className="w-full bg-warm-200 text-warm-700 py-2 rounded-lg text-sm font-medium hover:bg-warm-300 transition-all"
                     >
                       Cancel
                     </button>
@@ -676,7 +591,7 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
                     <button
                       onClick={() => setIsListingMode(true)}
                       disabled={isProcessing}
-                      className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full bg-forest-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-forest-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       List for Sale
                     </button>
@@ -686,7 +601,7 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
                         if (recipient) handleTransferTicket(selectedTicket, recipient);
                       }}
                       disabled={isProcessing}
-                      className="w-full bg-slate-200 text-slate-700 py-4 rounded-2xl font-bold hover:bg-slate-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full bg-warm-200 text-warm-700 py-2.5 rounded-lg text-sm font-medium hover:bg-warm-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isProcessing ? 'Processing...' : 'Transfer to Friend'}
                     </button>
@@ -697,86 +612,6 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
           </div>
         )}
       </aside>
-    </div>
-  );
-};
-
-// Ticket Card Component
-interface TicketCardProps {
-  ticket: Ticket;
-  isSelected: boolean;
-  onClick: () => void;
-  mode: 'browse' | 'my-tickets';
-  onList: (price: number) => void;
-  onCancel: () => void;
-  onTransfer: (address: string) => void;
-}
-
-const TicketCard: React.FC<TicketCardProps> = ({ ticket, isSelected, onClick, mode }) => {
-  const tierColor = getTierColor(ticket.tier_name);
-  const maxResalePrice = ticket.original_price * 3;
-  const isPriceValid = !ticket.resale_price || ticket.resale_price <= maxResalePrice;
-
-  return (
-    <div
-      onClick={onClick}
-      className={`bg-white p-6 flex flex-col cursor-pointer transition-all duration-300 hover:z-20 hover:shadow-2xl ${
-        isSelected ? 'ring-2 ring-blue-600 z-10' : ''
-      }`}
-    >
-      {/* Ticket Visual */}
-      <div className={`w-full aspect-[16/9] ${tierColor} rounded-2xl mb-5 p-4 flex flex-col justify-between text-white relative overflow-hidden shadow-lg`}>
-        {/* Watermark */}
-        <div className="absolute top-0 right-0 p-8 opacity-10 scale-150 rotate-12 text-9xl font-black select-none pointer-events-none">
-          TICKET
-        </div>
-
-        <div className="flex justify-between items-start relative z-10">
-          <div className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest italic">
-            {ticket.tier_name}
-          </div>
-          {ticket.is_listed && (
-            <div className="bg-green-500 px-2 py-1 rounded text-[9px] font-bold uppercase">
-              Listed
-            </div>
-          )}
-        </div>
-
-        <div className="relative z-10">
-          <h4 className="text-xl font-black leading-tight mb-1 truncate">{ticket.event_name}</h4>
-          <p className="text-xs font-medium opacity-80 uppercase tracking-wider">{ticket.venue}</p>
-        </div>
-      </div>
-
-      {/* Details Below Card */}
-      <div className="flex justify-between items-end">
-        <div>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-            {new Date(ticket.event_date).toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric'
-            })}
-          </p>
-          <p className="text-sm font-bold text-slate-700">#{ticket.ticket_number}</p>
-        </div>
-        <div className="text-right">
-          {mode === 'browse' && ticket.resale_price ? (
-            <>
-              <p className="text-2xl font-black text-slate-900 tracking-tighter">
-                ₳{ticket.resale_price}
-              </p>
-              {!isPriceValid && (
-                <p className="text-xs text-red-500 font-medium">Above cap</p>
-              )}
-            </>
-          ) : (
-            <p className="text-lg font-bold text-slate-500">
-              ₳{ticket.original_price}
-            </p>
-          )}
-        </div>
-      </div>
     </div>
   );
 };

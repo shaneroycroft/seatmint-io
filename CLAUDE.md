@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**SeatMint** is a decentralized ticketing platform on Cardano using **Plutus V3** (Aiken >= v1.1.17) and **Lucid Evolution**.
+**SeatMint** is a decentralized ticketing platform on Cardano using **Plutus V3** (Aiken v1.1.21) and **Lucid Evolution v0.4.29**.
 
 - **Frontend**: React (TypeScript) + Vite + Tailwind CSS v4
 - **Database**: Supabase (events, tickets, ticket_tiers, secondary_listings, platform_config tables)
@@ -46,13 +46,17 @@ aiken docs           # Generate HTML documentation
 
 ### The 3-Pillar System
 
-1. **Global Settings (NFT Pattern)**: A singleton UTxO containing platform config (fee %, treasury, max supply). This is NOT a spending validator—it's an NFT with inline datum that other validators `.readFrom()`. Never consume this UTxO during purchases.
+1. **Global Settings (NFT Pattern)** (`settings.ak`): A singleton UTxO containing platform config (fee %, treasury, max supply). The minting policy ensures only one Settings NFT can exist. This is NOT a spending validator—it's an NFT with inline datum that other validators `.readFrom()`. Never consume this UTxO during purchases.
 
 2. **Event Mint Policy** (`event_mint.ak`): Parameterized minting policy for ticket NFTs. Parameters: `organizer_pkh`, `settings_token`, `box_office_hash`.
 
 3. **Primary Sale Validator** (`primary_sale.ak`): Spending validator for initial ticket sales (box office). Payment flows: buyer pays, organizer receives revenue minus platform fee, treasury receives fee.
 
-4. **Storefront Validator** (`storefront.ak`): Secondary market for resales. Enforces royalties, price caps, and platform fees on peer-to-peer sales.
+4. **Storefront Validator** (`storefront.ak`): Secondary market for resales. Enforces royalties, price caps, and platform fees on peer-to-peer sales. Sellers lock their ticket NFT at the storefront address with a `TicketDatum`; buyers consume that UTxO and the validator ensures proper payment distribution.
+
+### NFT Metadata (CIP-68)
+
+Ticket NFTs use the CIP-68 standard for updatable metadata. This allows organizers to update ticket artwork or information post-mint without changing the token's policy ID.
 
 ### Key Files
 

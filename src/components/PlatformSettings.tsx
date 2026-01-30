@@ -201,7 +201,7 @@ export const PlatformSettings: React.FC<PlatformSettingsProps> = ({ lucid, admin
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
-        <div className="text-slate-500">Loading settings...</div>
+        <div className="text-warm-500">Loading settings...</div>
       </div>
     );
   }
@@ -209,8 +209,8 @@ export const PlatformSettings: React.FC<PlatformSettingsProps> = ({ lucid, admin
   if (!settings) {
     return (
       <div className="h-full flex items-center justify-center">
-        <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-          <p className="text-red-700 font-medium">Failed to load platform settings</p>
+        <div className="bg-terracotta-50 border border-terracotta-200 rounded-xl p-6">
+          <p className="text-terracotta-700 font-medium">Failed to load platform settings</p>
         </div>
       </div>
     );
@@ -219,37 +219,37 @@ export const PlatformSettings: React.FC<PlatformSettingsProps> = ({ lucid, admin
   return (
     <div className="h-full overflow-y-auto bg-white">
       {/* Header */}
-      <div className="p-8 border-b sticky top-0 bg-white/90 backdrop-blur-md z-10">
-        <p className="text-purple-600 font-bold text-xs uppercase tracking-[0.2em] mb-1">Admin Panel</p>
-        <h2 className="text-3xl font-black text-slate-900 tracking-tight">Platform Settings</h2>
+      <div className="px-6 py-4 border-b sticky top-0 bg-white/90 backdrop-blur-md z-10">
+        <p className="text-terracotta-600 font-semibold text-[10px] uppercase tracking-widest mb-0.5">Admin Panel</p>
+        <h2 className="text-xl font-bold text-warm-900">Platform Settings</h2>
       </div>
 
-      <div className="p-8 max-w-4xl mx-auto space-y-6">
+      <div className="p-5 max-w-3xl mx-auto space-y-4">
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-            <p className="text-red-700 font-medium">{error}</p>
+          <div className="bg-terracotta-50 border border-terracotta-200 rounded-lg p-3">
+            <p className="text-terracotta-700 text-sm font-medium">{error}</p>
           </div>
         )}
 
         {/* Market Status Card */}
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
-          <div className="flex items-center justify-between mb-6">
+        <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-4">
+          <div className="flex items-center justify-between mb-3">
             <div>
-              <h3 className="text-lg font-bold text-slate-900">Market Status</h3>
-              <p className="text-sm text-slate-500">Control the marketplace activity</p>
+              <h3 className="text-sm font-semibold text-warm-900">Market Status</h3>
+              <p className="text-xs text-warm-500">Control the marketplace activity</p>
             </div>
-            <div className={`w-4 h-4 rounded-full ${settings.isMarketActive ? 'bg-green-500' : 'bg-red-500'}`} />
+            <div className={`w-3 h-3 rounded-full ${settings.isMarketActive ? 'bg-forest-500' : 'bg-terracotta-500'}`} />
           </div>
 
-          <div className="flex items-center gap-6 mb-6">
-            <div className={`text-6xl ${settings.isMarketActive ? 'text-green-500' : 'text-red-500'}`}>
-              {settings.isMarketActive ? '●' : '●'}
+          <div className="flex items-center gap-4 mb-4">
+            <div className={`text-3xl ${settings.isMarketActive ? 'text-forest-500' : 'text-terracotta-500'}`}>
+              ●
             </div>
             <div>
-              <p className={`text-2xl font-black ${settings.isMarketActive ? 'text-green-600' : 'text-red-600'}`}>
+              <p className={`text-lg font-bold ${settings.isMarketActive ? 'text-forest-600' : 'text-terracotta-600'}`}>
                 {settings.isMarketActive ? 'ACTIVE' : 'STOPPED'}
               </p>
-              <p className="text-slate-500 text-sm">
+              <p className="text-warm-500 text-xs">
                 {settings.isMarketActive
                   ? 'All ticket sales and transfers are enabled'
                   : 'All marketplace activity is paused'}
@@ -260,10 +260,10 @@ export const PlatformSettings: React.FC<PlatformSettingsProps> = ({ lucid, admin
           <button
             onClick={toggleMarket}
             disabled={updating}
-            className={`w-full py-4 rounded-xl font-bold text-white transition-all disabled:opacity-50 ${
+            className={`w-full py-2.5 rounded-lg text-sm font-medium text-white transition-all disabled:opacity-50 ${
               settings.isMarketActive
-                ? 'bg-red-500 hover:bg-red-600'
-                : 'bg-green-500 hover:bg-green-600'
+                ? 'bg-terracotta-500 hover:bg-terracotta-600'
+                : 'bg-forest-500 hover:bg-forest-600'
             }`}
           >
             {updating ? 'Updating...' : settings.isMarketActive ? 'Emergency Stop Market' : 'Activate Market'}
@@ -271,22 +271,22 @@ export const PlatformSettings: React.FC<PlatformSettingsProps> = ({ lucid, admin
         </div>
 
         {/* Platform Fee Card */}
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
-          <div className="flex items-center justify-between mb-6">
+        <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-4">
+          <div className="flex items-center justify-between mb-3">
             <div>
-              <h3 className="text-lg font-bold text-slate-900">Platform Fee</h3>
-              <p className="text-sm text-slate-500">Fee charged on all ticket sales</p>
+              <h3 className="text-sm font-semibold text-warm-900">Platform Fee</h3>
+              <p className="text-xs text-warm-500">Fee charged on all ticket sales</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-sm text-slate-500 mb-2">Current Fee</p>
-              <p className="text-5xl font-black text-slate-900">{settings.platformFeePercent}%</p>
+              <p className="text-xs text-warm-500 mb-1">Current Fee</p>
+              <p className="text-2xl font-bold text-warm-900">{settings.platformFeePercent}%</p>
             </div>
 
             <div>
-              <label className="block text-sm text-slate-500 mb-2">Update Fee</label>
+              <label className="block text-xs text-warm-500 mb-1">Update Fee</label>
               <input
                 type="number"
                 min="0"
@@ -301,30 +301,30 @@ export const PlatformSettings: React.FC<PlatformSettingsProps> = ({ lucid, admin
                     }
                   }
                 }}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 bg-warm-50 border border-warm-200 rounded-lg text-sm text-warm-900 focus:outline-none focus:ring-2 focus:ring-forest-500"
               />
-              <p className="text-xs text-slate-400 mt-2">Max 10% | Changes limited to 2% per update</p>
+              <p className="text-[10px] text-warm-400 mt-1">Max 10%</p>
             </div>
           </div>
         </div>
 
         {/* Supply Limit Card */}
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
-          <div className="flex items-center justify-between mb-6">
+        <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-4">
+          <div className="flex items-center justify-between mb-3">
             <div>
-              <h3 className="text-lg font-bold text-slate-900">Global Supply Limit</h3>
-              <p className="text-sm text-slate-500">Maximum tickets per event</p>
+              <h3 className="text-sm font-semibold text-warm-900">Global Supply Limit</h3>
+              <p className="text-xs text-warm-500">Maximum tickets per event</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-sm text-slate-500 mb-2">Current Limit</p>
-              <p className="text-5xl font-black text-slate-900">{settings.currentMaxSupply.toLocaleString()}</p>
+              <p className="text-xs text-warm-500 mb-1">Current Limit</p>
+              <p className="text-2xl font-bold text-warm-900">{settings.currentMaxSupply.toLocaleString()}</p>
             </div>
 
             <div>
-              <label className="block text-sm text-slate-500 mb-2">Update Limit</label>
+              <label className="block text-xs text-warm-500 mb-1">Update Limit</label>
               <input
                 type="number"
                 min="1"
@@ -338,84 +338,83 @@ export const PlatformSettings: React.FC<PlatformSettingsProps> = ({ lucid, admin
                     }
                   }
                 }}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 bg-warm-50 border border-warm-200 rounded-lg text-sm text-warm-900 focus:outline-none focus:ring-2 focus:ring-forest-500"
               />
             </div>
           </div>
         </div>
 
         {/* Resale Multiplier Card */}
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
-          <div className="flex items-center justify-between mb-6">
+        <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-4">
+          <div className="flex items-center justify-between mb-3">
             <div>
-              <h3 className="text-lg font-bold text-slate-900">Anti-Scalping Limit</h3>
-              <p className="text-sm text-slate-500">Maximum resale price multiplier</p>
+              <h3 className="text-sm font-semibold text-warm-900">Anti-Scalping Limit</h3>
+              <p className="text-xs text-warm-500">Maximum resale price multiplier</p>
             </div>
           </div>
 
           <div>
-            <p className="text-sm text-slate-500 mb-2">Current Multiplier</p>
-            <p className="text-5xl font-black text-slate-900">{settings.maxResaleMultiplier / 100}x</p>
-            <p className="text-slate-500 text-sm mt-2">
+            <p className="text-xs text-warm-500 mb-1">Current Multiplier</p>
+            <p className="text-2xl font-bold text-warm-900">{settings.maxResaleMultiplier / 100}x</p>
+            <p className="text-warm-500 text-xs mt-1">
               Example: A 50 ADA ticket can be resold for max {(50 * settings.maxResaleMultiplier / 100).toFixed(0)} ADA
             </p>
           </div>
         </div>
 
         {/* Treasury Card */}
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-6">
-          <div className="flex items-center justify-between mb-4">
+        <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-4">
+          <div className="flex items-center justify-between mb-3">
             <div>
-              <h3 className="text-lg font-bold text-slate-900">Platform Treasury</h3>
-              <p className="text-sm text-slate-500">Address receiving platform fees</p>
+              <h3 className="text-sm font-semibold text-warm-900">Platform Treasury</h3>
+              <p className="text-xs text-warm-500">Address receiving platform fees</p>
             </div>
           </div>
 
-          <div className="bg-slate-50 rounded-xl p-4">
-            <p className="text-xs font-mono text-slate-700 break-all">
+          <div className="bg-warm-50 rounded-lg p-3">
+            <p className="text-[10px] font-mono text-warm-700 break-all">
               {settings.platformTreasury}
             </p>
           </div>
         </div>
 
         {/* On-Chain Settings Card */}
-        <div className="bg-white rounded-2xl shadow-lg border border-orange-200 p-6">
-          <div className="flex items-center justify-between mb-4">
+        <div className="bg-white rounded-xl shadow-sm border border-sand-300 p-4">
+          <div className="flex items-center justify-between mb-3">
             <div>
-              <h3 className="text-lg font-bold text-slate-900">On-Chain Settings (Advanced)</h3>
-              <p className="text-sm text-slate-500">Manage the on-chain GlobalSettings NFT</p>
+              <h3 className="text-sm font-semibold text-warm-900">On-Chain Settings (Advanced)</h3>
+              <p className="text-xs text-warm-500">Manage the on-chain GlobalSettings NFT</p>
             </div>
-            <div className={`px-3 py-1 rounded-full text-xs font-bold ${
+            <div className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
               onChainInitialized === null
-                ? 'bg-slate-100 text-slate-500'
+                ? 'bg-warm-100 text-warm-500'
                 : onChainInitialized
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-red-100 text-red-700'
+                  ? 'bg-forest-100 text-forest-700'
+                  : 'bg-terracotta-100 text-terracotta-700'
             }`}>
               {onChainInitialized === null ? 'Checking...' : onChainInitialized ? 'Initialized' : 'Not Initialized'}
             </div>
           </div>
 
-          <div className="bg-red-50 border border-red-300 rounded-xl p-4 mb-4">
-            <p className="text-red-800 text-sm font-bold mb-2">⚠️ Destructive Action</p>
-            <ul className="text-red-700 text-sm space-y-1 list-disc list-inside">
+          <div className="bg-terracotta-50 border border-terracotta-200 rounded-lg p-3 mb-3">
+            <p className="text-terracotta-800 text-xs font-semibold mb-1">Destructive Action</p>
+            <ul className="text-terracotta-700 text-[11px] space-y-0.5 list-disc list-inside">
               <li>Burns the existing Settings NFT permanently</li>
               <li>Creates a new Settings NFT with a different Policy ID</li>
               <li><strong>All existing events will become unusable</strong></li>
-              <li>You must create new events after reset</li>
             </ul>
           </div>
 
           <button
             onClick={handleResetAndReinitialize}
             disabled={reinitializing || !lucid || !onChainInitialized}
-            className="w-full py-4 rounded-xl font-bold text-white bg-red-500 hover:bg-red-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-2.5 rounded-lg text-sm font-medium text-white bg-terracotta-500 hover:bg-terracotta-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {reinitializing ? 'Processing... (Check wallet for signatures)' : '🔥 Burn & Reset Settings NFT'}
+            {reinitializing ? 'Processing... (Check wallet)' : 'Burn & Reset Settings NFT'}
           </button>
 
           {!lucid && (
-            <p className="text-center text-sm text-slate-500 mt-2">
+            <p className="text-center text-xs text-warm-500 mt-2">
               Connect your wallet to use this feature
             </p>
           )}

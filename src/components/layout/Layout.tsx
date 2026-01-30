@@ -23,7 +23,7 @@ export const Layout: React.FC<LayoutProps> = ({
   isOrganizer = false,
 }) => {
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900">
+    <div className="h-screen bg-warm-50 flex flex-col font-sans text-warm-900 overflow-hidden">
       <Header
         isConnected={isConnected}
         address={address}

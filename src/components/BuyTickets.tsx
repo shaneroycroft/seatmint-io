@@ -33,12 +33,12 @@ interface BuyTicketsProps {
 
 // Color scheme based on tier type
 const TIER_COLORS: Record<string, string> = {
-  vip: 'from-purple-500 to-purple-700',
-  backstage: 'from-red-500 to-red-700',
-  premium: 'from-amber-500 to-amber-700',
-  general: 'from-blue-500 to-blue-700',
-  standard: 'from-slate-500 to-slate-700',
-  default: 'from-emerald-500 to-emerald-700',
+  vip: 'from-sand-500 to-sand-700',
+  backstage: 'from-terracotta-500 to-terracotta-700',
+  premium: 'from-sand-400 to-sand-600',
+  general: 'from-forest-500 to-forest-700',
+  standard: 'from-warm-500 to-warm-700',
+  default: 'from-forest-500 to-forest-700',
 };
 
 const getTierGradient = (tierName: string): string => {
@@ -136,7 +136,7 @@ export const BuyTickets: React.FC<BuyTicketsProps> = ({ lucid, userAddress: _use
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
-        <div className="text-slate-500">Loading events...</div>
+        <div className="text-warm-500">Loading events...</div>
       </div>
     );
   }
@@ -149,10 +149,10 @@ export const BuyTickets: React.FC<BuyTicketsProps> = ({ lucid, userAddress: _use
         <div className="p-8 border-b sticky top-0 bg-white/90 backdrop-blur-md z-10">
           <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
             <div>
-              <p className="text-blue-600 font-bold text-xs uppercase tracking-[0.2em] mb-1">
+              <p className="text-forest-600 font-bold text-xs uppercase tracking-[0.2em] mb-1">
                 Primary Market
               </p>
-              <h2 className="text-3xl font-black text-slate-900 tracking-tight">
+              <h2 className="text-3xl font-black text-warm-900 tracking-tight">
                 Buy Tickets
               </h2>
             </div>
@@ -164,10 +164,10 @@ export const BuyTickets: React.FC<BuyTicketsProps> = ({ lucid, userAddress: _use
                 placeholder="Search events..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full md:w-80 px-4 py-2 pl-10 bg-slate-100 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full md:w-80 px-4 py-2 pl-10 bg-warm-100 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-forest-500"
               />
               <svg
-                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-warm-400"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -181,11 +181,11 @@ export const BuyTickets: React.FC<BuyTicketsProps> = ({ lucid, userAddress: _use
         {/* Events Grid */}
         {filteredEvents.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-16">
-            <div className="border-4 border-dashed border-slate-200 rounded-[32px] p-10 bg-white/50">
-              <h4 className="text-lg font-bold text-slate-800 mb-2">
+            <div className="border-4 border-dashed border-warm-200 rounded-[32px] p-10 bg-white/50">
+              <h4 className="text-lg font-bold text-warm-800 mb-2">
                 {searchQuery ? 'No matching events' : 'No events available'}
               </h4>
-              <p className="text-slate-400 text-sm">
+              <p className="text-warm-400 text-sm">
                 {searchQuery ? 'Try a different search term' : 'Check back later for upcoming events'}
               </p>
             </div>
@@ -211,34 +211,34 @@ export const BuyTickets: React.FC<BuyTicketsProps> = ({ lucid, userAddress: _use
       </div>
 
       {/* Sidebar - Purchase Panel */}
-      <aside className="w-full lg:w-[420px] bg-slate-50 p-8 flex flex-col shrink-0 border-l border-slate-100">
-        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 mb-6">
+      <aside className="w-full lg:w-[420px] bg-warm-50 p-8 flex flex-col shrink-0 border-l border-warm-100">
+        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-warm-400 mb-6">
           Purchase Details
         </h3>
 
         {/* Error/Success Messages */}
         {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl">
+          <div className="mb-4 p-4 bg-terracotta-50 border border-terracotta-200 rounded-xl">
             <div className="flex justify-between items-start">
-              <p className="text-sm text-red-700">{error}</p>
-              <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600 ml-2">×</button>
+              <p className="text-sm text-terracotta-700">{error}</p>
+              <button onClick={() => setError(null)} className="text-terracotta-400 hover:text-terracotta-600 ml-2">×</button>
             </div>
           </div>
         )}
 
         {success && (
-          <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-xl">
+          <div className="mb-4 p-4 bg-forest-50 border border-forest-200 rounded-xl">
             <div className="flex justify-between items-start">
-              <p className="text-sm text-green-700">{success}</p>
-              <button onClick={() => setSuccess(null)} className="text-green-400 hover:text-green-600 ml-2">×</button>
+              <p className="text-sm text-forest-700">{success}</p>
+              <button onClick={() => setSuccess(null)} className="text-forest-400 hover:text-forest-600 ml-2">×</button>
             </div>
           </div>
         )}
 
         {!selectedEvent ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-center border-4 border-dashed border-slate-200 rounded-[32px] p-10 bg-white/50">
-            <h4 className="text-lg font-bold text-slate-800 mb-2">Select an event</h4>
-            <p className="text-slate-400 text-sm">
+          <div className="flex-1 flex flex-col items-center justify-center text-center border-4 border-dashed border-warm-200 rounded-[32px] p-10 bg-white/50">
+            <h4 className="text-lg font-bold text-warm-800 mb-2">Select an event</h4>
+            <p className="text-warm-400 text-sm">
               Choose an event to view ticket options and purchase.
             </p>
           </div>
@@ -246,14 +246,14 @@ export const BuyTickets: React.FC<BuyTicketsProps> = ({ lucid, userAddress: _use
           <div className="flex-1 flex flex-col">
             {/* Event Summary */}
             <div className="bg-white p-6 rounded-2xl shadow-lg mb-6">
-              <h4 className="font-black text-xl text-slate-900 mb-2">{selectedEvent.event_name}</h4>
-              <p className="text-slate-500 text-sm mb-1">{selectedEvent.venue_name}</p>
-              <p className="text-slate-400 text-sm">{formatDate(selectedEvent.event_date)}</p>
+              <h4 className="font-black text-xl text-warm-900 mb-2">{selectedEvent.event_name}</h4>
+              <p className="text-warm-500 text-sm mb-1">{selectedEvent.venue_name}</p>
+              <p className="text-warm-400 text-sm">{formatDate(selectedEvent.event_date)}</p>
             </div>
 
             {/* Tier Selection */}
             <div className="mb-6">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 block">
+              <label className="text-xs font-bold uppercase tracking-wider text-warm-500 mb-3 block">
                 Select Tier
               </label>
               <div className="space-y-2">
@@ -267,16 +267,16 @@ export const BuyTickets: React.FC<BuyTicketsProps> = ({ lucid, userAddress: _use
                     disabled={tier.remaining_supply === 0}
                     className={`w-full p-4 rounded-xl text-left transition-all ${
                       selectedTier?.id === tier.id
-                        ? 'bg-blue-600 text-white shadow-lg'
+                        ? 'bg-forest-700 text-white shadow-lg'
                         : tier.remaining_supply === 0
-                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                        : 'bg-white hover:bg-slate-50 text-slate-900 border border-slate-200'
+                        ? 'bg-warm-100 text-warm-400 cursor-not-allowed'
+                        : 'bg-white hover:bg-warm-50 text-warm-900 border border-warm-200'
                     }`}
                   >
                     <div className="flex justify-between items-center">
                       <div>
                         <p className="font-bold">{tier.tier_name}</p>
-                        <p className={`text-xs ${selectedTier?.id === tier.id ? 'text-blue-200' : 'text-slate-400'}`}>
+                        <p className={`text-xs ${selectedTier?.id === tier.id ? 'text-forest-200' : 'text-warm-400'}`}>
                           {tier.remaining_supply} of {tier.total_supply} remaining
                         </p>
                       </div>
@@ -292,24 +292,24 @@ export const BuyTickets: React.FC<BuyTicketsProps> = ({ lucid, userAddress: _use
             {/* Quantity Selection */}
             {selectedTier && selectedTier.remaining_supply > 0 && (
               <div className="mb-6">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 block">
+                <label className="text-xs font-bold uppercase tracking-wider text-warm-500 mb-3 block">
                   Quantity
                 </label>
                 <div className="flex items-center gap-4">
                   <button
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="w-12 h-12 bg-slate-200 hover:bg-slate-300 rounded-xl font-bold text-xl transition-colors"
+                    className="w-12 h-12 bg-warm-200 hover:bg-warm-300 rounded-xl font-bold text-xl transition-colors"
                   >
                     -
                   </button>
                   <span className="text-2xl font-black w-12 text-center">{quantity}</span>
                   <button
                     onClick={() => setQuantity(Math.min(selectedTier.max_per_wallet, selectedTier.remaining_supply, quantity + 1))}
-                    className="w-12 h-12 bg-slate-200 hover:bg-slate-300 rounded-xl font-bold text-xl transition-colors"
+                    className="w-12 h-12 bg-warm-200 hover:bg-warm-300 rounded-xl font-bold text-xl transition-colors"
                   >
                     +
                   </button>
-                  <span className="text-sm text-slate-400">
+                  <span className="text-sm text-warm-400">
                     Max {Math.min(selectedTier.max_per_wallet, selectedTier.remaining_supply)}
                   </span>
                 </div>
@@ -320,16 +320,16 @@ export const BuyTickets: React.FC<BuyTicketsProps> = ({ lucid, userAddress: _use
             {selectedTier && (
               <div className="bg-white p-6 rounded-2xl shadow-lg mb-6">
                 <div className="flex justify-between items-center mb-4">
-                  <span className="text-slate-500">Price per ticket</span>
+                  <span className="text-warm-500">Price per ticket</span>
                   <span className="font-mono font-bold">₳{formatPrice(selectedTier.price_lovelace)}</span>
                 </div>
                 <div className="flex justify-between items-center mb-4">
-                  <span className="text-slate-500">Quantity</span>
+                  <span className="text-warm-500">Quantity</span>
                   <span className="font-bold">×{quantity}</span>
                 </div>
-                <div className="pt-4 border-t-2 border-dashed border-slate-100 flex justify-between items-end">
-                  <span className="text-xs font-black uppercase text-slate-400 tracking-widest">Total</span>
-                  <span className="text-3xl font-black text-slate-900 tracking-tighter">
+                <div className="pt-4 border-t-2 border-dashed border-warm-100 flex justify-between items-end">
+                  <span className="text-xs font-black uppercase text-warm-400 tracking-widest">Total</span>
+                  <span className="text-3xl font-black text-warm-900 tracking-tighter">
                     ₳{formatPrice(selectedTier.price_lovelace * quantity)}
                   </span>
                 </div>
@@ -341,7 +341,7 @@ export const BuyTickets: React.FC<BuyTicketsProps> = ({ lucid, userAddress: _use
               <button
                 onClick={handlePurchase}
                 disabled={isPurchasing}
-                className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black text-lg shadow-xl hover:bg-black transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+                className="w-full bg-forest-700 text-white py-5 rounded-2xl font-black text-lg shadow-xl hover:bg-forest-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
               >
                 {isPurchasing ? (
                   <>
@@ -386,7 +386,7 @@ const EventCard: React.FC<EventCardProps> = ({ event, isSelected, onClick }) => 
     <div
       onClick={onClick}
       className={`bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all cursor-pointer ${
-        isSelected ? 'ring-2 ring-blue-600' : ''
+        isSelected ? 'ring-2 ring-forest-600' : ''
       } ${isSoldOut ? 'opacity-60' : ''}`}
     >
       {/* Event Header with Gradient */}
@@ -404,11 +404,11 @@ const EventCard: React.FC<EventCardProps> = ({ event, isSelected, onClick }) => 
 
         {/* Status Badge */}
         {isSoldOut ? (
-          <div className="bg-red-500 px-3 py-1 rounded-lg text-white text-xs font-bold uppercase">
+          <div className="bg-terracotta-500 px-3 py-1 rounded-lg text-white text-xs font-bold uppercase">
             Sold Out
           </div>
         ) : (
-          <div className="bg-green-500 px-3 py-1 rounded-lg text-white text-xs font-bold uppercase">
+          <div className="bg-forest-600 px-3 py-1 rounded-lg text-white text-xs font-bold uppercase">
             {totalRemaining} Left
           </div>
         )}
@@ -416,17 +416,17 @@ const EventCard: React.FC<EventCardProps> = ({ event, isSelected, onClick }) => 
 
       {/* Event Details */}
       <div className="p-5">
-        <h3 className="font-black text-lg text-slate-900 mb-1 truncate">{event.event_name}</h3>
-        <p className="text-slate-500 text-sm mb-3 truncate">{event.venue_name}</p>
+        <h3 className="font-black text-lg text-warm-900 mb-1 truncate">{event.event_name}</h3>
+        <p className="text-warm-500 text-sm mb-3 truncate">{event.venue_name}</p>
 
         <div className="flex justify-between items-end">
           <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">From</p>
-            <p className="text-xl font-black text-slate-900">₳{(lowestPrice / 1_000_000).toFixed(0)}</p>
+            <p className="text-[10px] font-bold text-warm-400 uppercase tracking-wider">From</p>
+            <p className="text-xl font-black text-warm-900">₳{(lowestPrice / 1_000_000).toFixed(0)}</p>
           </div>
           <div className="text-right">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tiers</p>
-            <p className="text-sm font-bold text-slate-600">{event.ticket_tiers.length} available</p>
+            <p className="text-[10px] font-bold text-warm-400 uppercase tracking-wider">Tiers</p>
+            <p className="text-sm font-bold text-warm-600">{event.ticket_tiers.length} available</p>
           </div>
         </div>
       </div>

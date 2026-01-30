@@ -277,23 +277,23 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
     return (
       <div className="h-full flex items-center justify-center p-8">
         <div className="max-w-lg w-full bg-white rounded-2xl shadow-xl p-8">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="w-16 h-16 bg-forest-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg className="w-8 h-8 text-forest-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
 
-          <h2 className="text-2xl font-black text-slate-900 text-center mb-2">Event Created!</h2>
-          <p className="text-slate-500 text-center mb-6">Your event is now live on the blockchain.</p>
+          <h2 className="text-2xl font-black text-warm-900 text-center mb-2">Event Created!</h2>
+          <p className="text-warm-500 text-center mb-6">Your event is now live on the blockchain.</p>
 
-          <div className="bg-slate-50 rounded-xl p-4 mb-4">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Event ID</p>
-            <p className="text-xs font-mono text-slate-700 break-all">{createdEventId}</p>
+          <div className="bg-warm-50 rounded-xl p-4 mb-4">
+            <p className="text-xs font-bold text-warm-400 uppercase tracking-wider mb-2">Event ID</p>
+            <p className="text-xs font-mono text-warm-700 break-all">{createdEventId}</p>
           </div>
 
-          <div className="bg-slate-50 rounded-xl p-4 mb-6">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Policy ID</p>
-            <p className="text-xs font-mono text-slate-700 break-all">{createdPolicyId}</p>
+          <div className="bg-warm-50 rounded-xl p-4 mb-6">
+            <p className="text-xs font-bold text-warm-400 uppercase tracking-wider mb-2">Policy ID</p>
+            <p className="text-xs font-mono text-warm-700 break-all">{createdPolicyId}</p>
           </div>
 
           <button
@@ -306,7 +306,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
                 eventName: '', eventDescription: '', eventDate: '', location: '', venue: '', bannerImageUrl: '', category: 'concert',
               });
             }}
-            className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors"
+            className="w-full py-4 bg-forest-600 hover:bg-forest-700 text-white font-bold rounded-xl transition-colors"
           >
             Create Another Event
           </button>
@@ -327,60 +327,60 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
       {/* Main Form */}
       <div className="flex-1 overflow-y-auto">
         <div className="p-8 border-b sticky top-0 bg-white/90 backdrop-blur-md z-10">
-          <p className="text-blue-600 font-bold text-xs uppercase tracking-[0.2em] mb-1">Organizer Portal</p>
-          <h2 className="text-3xl font-black text-slate-900 tracking-tight">Create Event</h2>
+          <p className="text-terracotta-600 font-bold text-xs uppercase tracking-[0.2em] mb-1">Organizer Portal</p>
+          <h2 className="text-3xl font-black text-warm-900 tracking-tight">Create Event</h2>
         </div>
 
         <form onSubmit={handleSubmit} className="p-8 space-y-8">
           {/* Event Details Section */}
           <div>
-            <h3 className="text-sm font-black uppercase tracking-wider text-slate-400 mb-4">Event Details</h3>
+            <h3 className="text-sm font-black uppercase tracking-wider text-warm-400 mb-4">Event Details</h3>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Event Name *</label>
+                <label className="block text-sm font-semibold text-warm-700 mb-2">Event Name *</label>
                 <input
                   type="text"
                   required
                   value={formData.eventName}
                   onChange={(e) => setFormData({ ...formData, eventName: e.target.value })}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-3 bg-warm-50 border border-warm-200 rounded-xl text-warm-900 placeholder-warm-400 focus:outline-none focus:ring-2 focus:ring-forest-500 focus:border-transparent"
                   placeholder="Summer Music Festival 2026"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Description</label>
+                <label className="block text-sm font-semibold text-warm-700 mb-2">Description</label>
                 <textarea
                   value={formData.eventDescription}
                   onChange={(e) => setFormData({ ...formData, eventDescription: e.target.value })}
                   rows={3}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  className="w-full px-4 py-3 bg-warm-50 border border-warm-200 rounded-xl text-warm-900 placeholder-warm-400 focus:outline-none focus:ring-2 focus:ring-forest-500 focus:border-transparent resize-none"
                   placeholder="Describe your event..."
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Date & Time *</label>
+                  <label className="block text-sm font-semibold text-warm-700 mb-2">Date & Time *</label>
                   <input
                     type="datetime-local"
                     required
                     min={getMinDateTime()}
                     value={formData.eventDate}
                     onChange={(e) => setFormData({ ...formData, eventDate: e.target.value as string })}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 bg-warm-50 border border-warm-200 rounded-xl text-warm-900 focus:outline-none focus:ring-2 focus:ring-forest-500 focus:border-transparent"
                   />
-                  <p className="text-xs text-slate-400 mt-1">Must be a future date</p>
+                  <p className="text-xs text-warm-400 mt-1">Must be a future date</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Category *</label>
+                  <label className="block text-sm font-semibold text-warm-700 mb-2">Category *</label>
                   <select
                     required
                     value={formData.category}
                     onChange={(e) => setFormData({ ...formData, category: e.target.value as EventCreationParams['category'] })}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 bg-warm-50 border border-warm-200 rounded-xl text-warm-900 focus:outline-none focus:ring-2 focus:ring-forest-500 focus:border-transparent"
                   >
                     <option value="concert">Concert</option>
                     <option value="sports">Sports</option>
@@ -393,7 +393,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
 
               {/* Venue Autocomplete */}
               <div className="relative">
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Venue Name *</label>
+                <label className="block text-sm font-semibold text-warm-700 mb-2">Venue Name *</label>
                 <input
                   ref={venueInputRef}
                   type="text"
@@ -402,26 +402,26 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
                   onChange={(e) => handleVenueChange(e.target.value)}
                   onFocus={() => venueQuery.length >= 2 && setShowVenueSuggestions(venueSuggestions.length > 0)}
                   onBlur={() => setTimeout(() => setShowVenueSuggestions(false), 200)}
-                  className={`w-full px-4 py-3 bg-slate-50 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    selectedVenue ? 'border-green-500' : 'border-slate-200'
+                  className={`w-full px-4 py-3 bg-warm-50 border rounded-xl text-warm-900 placeholder-warm-400 focus:outline-none focus:ring-2 focus:ring-forest-500 focus:border-transparent ${
+                    selectedVenue ? 'border-forest-500' : 'border-warm-200'
                   }`}
                   placeholder="Start typing venue name..."
                   autoComplete="off"
                 />
                 {selectedVenue && (
-                  <p className="text-xs text-green-600 mt-1 font-medium">Known venue - address auto-filled</p>
+                  <p className="text-xs text-forest-600 mt-1 font-medium">Known venue - address auto-filled</p>
                 )}
 
                 {showVenueSuggestions && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-warm-200 rounded-xl shadow-xl z-50 overflow-hidden">
                     {venueSuggestions.map((venue, index) => (
                       <div
                         key={index}
                         onClick={() => selectVenue(venue)}
-                        className="px-4 py-3 cursor-pointer hover:bg-slate-50 border-b border-slate-100 last:border-0"
+                        className="px-4 py-3 cursor-pointer hover:bg-warm-50 border-b border-warm-100 last:border-0"
                       >
-                        <p className="font-semibold text-slate-900">{venue.name}</p>
-                        <p className="text-xs text-slate-500">{venue.city}, {venue.country} {venue.capacity && `• ${venue.capacity.toLocaleString()} capacity`}</p>
+                        <p className="font-semibold text-warm-900">{venue.name}</p>
+                        <p className="text-xs text-warm-500">{venue.city}, {venue.country} {venue.capacity && `• ${venue.capacity.toLocaleString()} capacity`}</p>
                       </div>
                     ))}
                   </div>
@@ -429,17 +429,17 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                <label className="block text-sm font-semibold text-warm-700 mb-2">
                   Location / Address *
-                  {selectedVenue && <span className="text-green-600 ml-2 text-xs">(auto-filled)</span>}
+                  {selectedVenue && <span className="text-forest-600 ml-2 text-xs">(auto-filled)</span>}
                 </label>
                 <input
                   type="text"
                   required
                   value={formData.location}
                   onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  className={`w-full px-4 py-3 border rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    selectedVenue ? 'bg-green-50 border-green-500' : 'bg-slate-50 border-slate-200'
+                  className={`w-full px-4 py-3 border rounded-xl text-warm-900 placeholder-warm-400 focus:outline-none focus:ring-2 focus:ring-forest-500 focus:border-transparent ${
+                    selectedVenue ? 'bg-forest-50 border-forest-500' : 'bg-warm-50 border-warm-200'
                   }`}
                   placeholder="123 Main St, New York, NY, USA"
                 />
@@ -447,41 +447,41 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
 
               {/* Duplicate Warning */}
               {duplicateWarning && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                  <p className="text-amber-800 font-semibold text-sm">Possible Duplicate</p>
-                  <p className="text-amber-700 text-sm mt-1">{duplicateWarning}</p>
+                <div className="bg-sand-50 border border-sand-200 rounded-xl p-4">
+                  <p className="text-sand-800 font-semibold text-sm">Possible Duplicate</p>
+                  <p className="text-sand-700 text-sm mt-1">{duplicateWarning}</p>
                 </div>
               )}
-              {isCheckingDuplicate && <p className="text-xs text-slate-400">Checking for similar events...</p>}
+              {isCheckingDuplicate && <p className="text-xs text-warm-400">Checking for similar events...</p>}
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Banner Image URL</label>
+                <label className="block text-sm font-semibold text-warm-700 mb-2">Banner Image URL</label>
                 <input
                   type="url"
                   value={formData.bannerImageUrl}
                   onChange={(e) => setFormData({ ...formData, bannerImageUrl: e.target.value })}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-3 bg-warm-50 border border-warm-200 rounded-xl text-warm-900 placeholder-warm-400 focus:outline-none focus:ring-2 focus:ring-forest-500 focus:border-transparent"
                   placeholder="https://... or ipfs://..."
                 />
-                <p className="text-xs text-slate-400 mt-1">Recommended: 1200x630px, max 5MB. Formats: JPG, PNG, GIF, WebP</p>
+                <p className="text-xs text-warm-400 mt-1">Recommended: 1200x630px, max 5MB. Formats: JPG, PNG, GIF, WebP</p>
               </div>
             </div>
           </div>
 
           {/* Ticket Tiers Section */}
           <div>
-            <h3 className="text-sm font-black uppercase tracking-wider text-slate-400 mb-4">Ticket Tiers</h3>
+            <h3 className="text-sm font-black uppercase tracking-wider text-warm-400 mb-4">Ticket Tiers</h3>
 
             <div className="space-y-4">
               {ticketTiers.map((tier, index) => (
-                <div key={index} className="bg-slate-50 rounded-2xl p-6 border border-slate-200">
+                <div key={index} className="bg-warm-50 rounded-2xl p-6 border border-warm-200">
                   <div className="flex justify-between items-center mb-4">
-                    <h4 className="font-bold text-slate-700">Tier {index + 1}</h4>
+                    <h4 className="font-bold text-warm-700">Tier {index + 1}</h4>
                     {ticketTiers.length > 1 && (
                       <button
                         type="button"
                         onClick={() => removeTicketTier(index)}
-                        className="text-red-500 hover:text-red-700 text-sm font-medium"
+                        className="text-terracotta-500 hover:text-terracotta-700 text-sm font-medium"
                       >
                         Remove
                       </button>
@@ -490,18 +490,18 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 mb-1">Name *</label>
+                      <label className="block text-xs font-semibold text-warm-500 mb-1">Name *</label>
                       <input
                         type="text"
                         required
                         value={tier.tierName}
                         onChange={(e) => updateTicketTier(index, 'tierName', e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 bg-white border border-warm-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-forest-500"
                         placeholder="VIP, General, etc."
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 mb-1">Price (ADA) *</label>
+                      <label className="block text-xs font-semibold text-warm-500 mb-1">Price (ADA) *</label>
                       <input
                         type="number"
                         required
@@ -509,40 +509,40 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
                         step="0.01"
                         value={tier.priceAda}
                         onChange={(e) => updateTicketTier(index, 'priceAda', e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 bg-white border border-warm-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-forest-500"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 mb-1">Supply *</label>
+                      <label className="block text-xs font-semibold text-warm-500 mb-1">Supply *</label>
                       <input
                         type="number"
                         required
                         min="1"
                         value={tier.totalSupply}
                         onChange={(e) => updateTicketTier(index, 'totalSupply', e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 bg-white border border-warm-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-forest-500"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-500 mb-1">Max/Wallet *</label>
+                      <label className="block text-xs font-semibold text-warm-500 mb-1">Max/Wallet *</label>
                       <input
                         type="number"
                         required
                         min="1"
                         value={tier.maxPerWallet}
                         onChange={(e) => updateTicketTier(index, 'maxPerWallet', e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 bg-white border border-warm-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-forest-500"
                       />
                     </div>
                   </div>
 
                   <div className="mt-4">
-                    <label className="block text-xs font-semibold text-slate-500 mb-1">Description</label>
+                    <label className="block text-xs font-semibold text-warm-500 mb-1">Description</label>
                     <input
                       type="text"
                       value={tier.tierDescription}
                       onChange={(e) => updateTicketTier(index, 'tierDescription', e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 bg-white border border-warm-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-forest-500"
                       placeholder="Tier benefits..."
                     />
                   </div>
@@ -552,7 +552,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
               <button
                 type="button"
                 onClick={addTicketTier}
-                className="w-full py-3 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 font-semibold hover:border-blue-500 hover:text-blue-500 transition-colors"
+                className="w-full py-3 border-2 border-dashed border-warm-300 rounded-xl text-warm-500 font-semibold hover:border-forest-500 hover:text-forest-600 transition-colors"
               >
                 + Add Another Tier
               </button>
@@ -561,13 +561,13 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
 
           {/* Transaction Status */}
           {isSubmitting && txStatus !== 'idle' && (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+            <div className="bg-forest-50 border border-forest-200 rounded-xl p-6">
               <div className="flex items-center gap-4">
-                <div className="w-6 h-6 border-2 border-slate-300 border-t-blue-600 rounded-full animate-spin" />
+                <div className="w-6 h-6 border-2 border-warm-300 border-t-forest-600 rounded-full animate-spin" />
                 <div>
-                  <p className="font-bold text-blue-900">{TX_STATUS_MESSAGES[txStatus]}</p>
+                  <p className="font-bold text-forest-900">{TX_STATUS_MESSAGES[txStatus]}</p>
                   {txStatus === 'awaiting_signature' && (
-                    <p className="text-sm text-blue-700 mt-1">Check your wallet extension</p>
+                    <p className="text-sm text-forest-700 mt-1">Check your wallet extension</p>
                   )}
                 </div>
               </div>
@@ -582,7 +582,7 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
                   return (
                     <div
                       key={step}
-                      className={`flex-1 h-1 rounded ${isComplete ? 'bg-green-500' : isCurrent ? 'bg-blue-500' : 'bg-slate-200'}`}
+                      className={`flex-1 h-1 rounded ${isComplete ? 'bg-forest-500' : isCurrent ? 'bg-forest-400' : 'bg-warm-200'}`}
                     />
                   );
                 })}
@@ -591,15 +591,15 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
           )}
 
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-              <p className="text-red-700 font-medium">{error}</p>
+            <div className="bg-terracotta-50 border border-terracotta-200 rounded-xl p-4">
+              <p className="text-terracotta-700 font-medium">{error}</p>
             </div>
           )}
 
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-5 bg-slate-900 hover:bg-black text-white font-black text-lg rounded-2xl shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-5 bg-forest-700 hover:bg-forest-800 text-white font-black text-lg rounded-2xl shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? 'Creating Event...' : 'Create Event'}
           </button>
@@ -607,8 +607,8 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
       </div>
 
       {/* Preview Sidebar */}
-      <aside className="w-full lg:w-[400px] bg-slate-50 p-8 border-l border-slate-100 shrink-0 overflow-y-auto">
-        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 mb-6">Ticket Preview</h3>
+      <aside className="w-full lg:w-[400px] bg-warm-50 p-8 border-l border-warm-100 shrink-0 overflow-y-auto">
+        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-warm-400 mb-6">Ticket Preview</h3>
 
         <TicketPreview
           eventName={formData.eventName}
@@ -621,20 +621,20 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
           organizerName="You (Organizer)"
         />
 
-        <div className="mt-6 p-4 bg-white rounded-xl border border-dashed border-slate-200">
-          <p className="text-slate-500 text-xs leading-relaxed">
+        <div className="mt-6 p-4 bg-white rounded-xl border border-dashed border-warm-200">
+          <p className="text-warm-500 text-xs leading-relaxed">
             This preview updates live as you fill in the form. The final ticket will include blockchain verification.
           </p>
         </div>
 
         {ticketTiers.length > 1 && (
           <div className="mt-6">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Other Tiers</p>
+            <p className="text-xs font-bold text-warm-400 uppercase tracking-wider mb-3">Other Tiers</p>
             <div className="flex flex-wrap gap-2">
               {ticketTiers.slice(1).map((tier, index) => (
                 <span
                   key={index}
-                  className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-600"
+                  className="px-3 py-1.5 bg-white border border-warm-200 rounded-lg text-xs font-medium text-warm-600"
                 >
                   {tier.tierName || `Tier ${index + 2}`} - ₳{tier.priceAda}
                 </span>

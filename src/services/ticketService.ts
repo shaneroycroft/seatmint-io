@@ -511,10 +511,39 @@ export async function purchaseTickets(
   }
   console.log('Selected sale UTxO:', saleUTxO.txHash + '#' + saleUTxO.outputIndex);
 
+  // DEBUG: Decode and inspect the sale datum
+  const saleDatumDecoded = Data.from(saleUTxO.datum!);
+  if (saleDatumDecoded instanceof Constr) {
+    console.log('DEBUG Sale Datum:');
+    console.log('  Full datum:', JSON.stringify(saleDatumDecoded, (_, v) => typeof v === 'bigint' ? v.toString() : v, 2));
+    console.log('  Field 0 (organizer_address):', JSON.stringify(saleDatumDecoded.fields[0], (_, v) => typeof v === 'bigint' ? v.toString() : v));
+    console.log('  Field 1 (base_price):', saleDatumDecoded.fields[1]?.toString());
+    console.log('  Field 2 (event_policy):', saleDatumDecoded.fields[2]);
+    console.log('  DB price_lovelace:', tier.price_lovelace);
+
+    // Check if prices match
+    const datumBasePrice = saleDatumDecoded.fields[1];
+    if (BigInt(tier.price_lovelace) !== BigInt(datumBasePrice as bigint)) {
+      console.error('⚠️ PRICE MISMATCH! DB price:', tier.price_lovelace, 'Datum price:', datumBasePrice?.toString());
+    }
+  }
+
   // Step 6: Generate ticket names and calculate payments
   const ticketNames = await generateTicketNames(tier.events.event_policy_id, params.quantity);
-  const pricePerTicket = BigInt(tier.price_lovelace);
-  const totalPrice = pricePerTicket * BigInt(params.quantity);
+
+  // IMPORTANT: Use datum's base_price (not DB price) to match validator calculation
+  const datumForPrice = Data.from(saleUTxO.datum!);
+  let basePriceFromDatum: bigint;
+  if (datumForPrice instanceof Constr && datumForPrice.fields[1] !== undefined) {
+    basePriceFromDatum = BigInt(datumForPrice.fields[1] as bigint);
+    console.log('Using base_price from datum:', basePriceFromDatum.toString(), 'lovelace');
+  } else {
+    // Fallback to DB price if datum parse fails
+    basePriceFromDatum = BigInt(tier.price_lovelace);
+    console.warn('Could not parse datum base_price, falling back to DB:', basePriceFromDatum.toString());
+  }
+
+  const totalPrice = basePriceFromDatum * BigInt(params.quantity);
   const platformFee = (totalPrice * BigInt(settings.platform_fee_bps)) / 10000n;
   const organizerPayment = totalPrice - platformFee;
 
@@ -551,6 +580,29 @@ export async function purchaseTickets(
   const treasuryPkh = aikenAddressToPkh(settings.platform_treasury as DecodedAddress);
   const treasuryAddress = pkhToAddress(treasuryPkh, network);
 
+  // DEBUG: Compare datum address with payment address
+  const saleDatumDecoded2 = Data.from(saleUTxO.datum!);
+  if (saleDatumDecoded2 instanceof Constr) {
+    const datumAddr = saleDatumDecoded2.fields[0];
+    const expectedAddr = pkhToAikenAddress(organizerPKH);
+    console.log('DEBUG Address Comparison:');
+    console.log('  Datum address Constr:', JSON.stringify(datumAddr, (_, v) => typeof v === 'bigint' ? v.toString() : v));
+    console.log('  Expected address Constr:', JSON.stringify(expectedAddr, (_, v) => typeof v === 'bigint' ? v.toString() : v));
+    console.log('  Datum address CBOR:', Data.to(datumAddr as Data));
+    console.log('  Expected address CBOR:', Data.to(expectedAddr as Data));
+    console.log('  Do CBORs match?:', Data.to(datumAddr as Data) === Data.to(expectedAddr as Data));
+    console.log('  Organizer PKH from DB:', organizerPKH);
+    console.log('  Paying to bech32:', organizerPaymentAddress);
+
+    // Extract PKH from datum address for comparison
+    if (datumAddr instanceof Constr && datumAddr.fields[0] instanceof Constr) {
+      const datumPkh = datumAddr.fields[0].fields[0];
+      console.log('  Datum PKH:', datumPkh);
+      console.log('  Expected PKH:', organizerPKH);
+      console.log('  PKHs match?:', datumPkh === organizerPKH);
+    }
+  }
+
   // Step 10: Build metadata (CIP-25)
   const metadata = buildCIP25Metadata(
     tier.events.event_policy_id,
@@ -563,6 +615,12 @@ export async function purchaseTickets(
   console.log('  Quantity:', params.quantity);
   console.log('  Organizer payment:', organizerPayment.toString(), 'lovelace');
   console.log('  Platform fee:', platformFee.toString(), 'lovelace');
+  console.log('  Settings reference UTxO datum CBOR (first 100 chars):', settingsUTxO.datum?.slice(0, 100));
+
+  // WARNING: If platform fee < ~1.5 ADA, the treasury output will fail min UTxO check
+  if (platformFee < 1_500_000n) {
+    console.warn('⚠️ Platform fee', platformFee.toString(), 'lovelace is below minimum UTxO (~1.5 ADA). Transaction may fail.');
+  }
 
   // Debug: Log key addresses and UTxOs
   console.log('DEBUG Transaction Inputs:');
@@ -767,7 +825,7 @@ export async function listTicketForResale(
 
   const listingRef = `${txHash}#0`;
 
-  await supabase.from('secondary_listings').insert({
+  const { error: listingError } = await supabase.from('secondary_listings').insert({
     ticket_id: params.ticketAssetName,
     seller_address: sellerAddress,
     price_lovelace: Math.floor(params.priceAda * 1_000_000),
@@ -775,15 +833,34 @@ export async function listTicketForResale(
     status: 'active',
   });
 
+  if (listingError) {
+    console.warn('Failed to insert secondary_listing (non-fatal):', listingError);
+  }
+
   // Also update the tickets table so UI can track listing status
-  await supabase
+  console.log('Updating ticket status to listed for:', params.ticketAssetName);
+  const { data: updatedTicket, error: ticketUpdateError } = await supabase
     .from('tickets')
     .update({
       status: 'listed',
       resale_price: Math.floor(params.priceAda * 1_000_000),
       listing_utxo_ref: listingRef,
     })
-    .eq('nft_asset_name', params.ticketAssetName);
+    .eq('nft_asset_name', params.ticketAssetName)
+    .select()
+    .maybeSingle();
+
+  if (ticketUpdateError) {
+    console.error('Failed to update ticket status:', ticketUpdateError);
+    throw new Error(`Failed to update ticket listing in database: ${ticketUpdateError.message}`);
+  }
+
+  if (!updatedTicket) {
+    console.error('No ticket found with nft_asset_name:', params.ticketAssetName);
+    console.log('The ticket may not exist in the database yet. Try syncing your wallet first.');
+  } else {
+    console.log('Ticket updated successfully:', updatedTicket.id, '-> status:', updatedTicket.status);
+  }
 
   return { txHash, listingUTxORef: listingRef };
 }
@@ -1708,6 +1785,23 @@ export async function initializePlatformSettings(
 ): Promise<{ txHash: string; settingsPolicyId: string; settingsUtxoRef: string }> {
 
   console.log('Initializing platform settings...');
+
+  // GUARD: Check if platform settings already exist in database
+  const { data: existingConfig } = await supabase
+    .from('platform_config')
+    .select('settings_policy_id, settings_utxo_ref')
+    .eq('id', 'main')
+    .maybeSingle();
+
+  if (existingConfig?.settings_policy_id && existingConfig?.settings_utxo_ref) {
+    console.warn('⚠️ Platform settings already exist! Skipping re-initialization.');
+    console.log('   Existing Policy ID:', existingConfig.settings_policy_id);
+    console.log('   Existing UTxO Ref:', existingConfig.settings_utxo_ref);
+    throw new Error(
+      'Platform settings already exist. Use the Settings page to burn and reset if needed. ' +
+      `Existing Policy: ${existingConfig.settings_policy_id}`
+    );
+  }
 
   // Get admin address (deployer)
   const adminAddress = await lucid.wallet().address();

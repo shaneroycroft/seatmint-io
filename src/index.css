@@ -1,10 +1,14 @@
 @import "tailwindcss";
+@config "../tailwind.config.js";
 
 /* Base styles */
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  font-family: 'Jost', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Animation for spinner */
@@ -15,4 +19,21 @@ body {
 
 .animate-spin {
   animation: spin 1s linear infinite;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Better focus styles */
+*:focus-visible {
+  outline: 2px solid #4d7650;
+  outline-offset: 2px;
+}
+
+/* Selection color to match brand */
+::selection {
+  background-color: #c7d7c7;
+  color: #233325;
 }

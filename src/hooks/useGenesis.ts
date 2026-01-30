@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Lucid } from '@lucid-evolution/lucid';
 import { supabase } from '../lib/supabase';
 import { initializePlatformSettings } from '../services/ticketService';
@@ -9,6 +9,7 @@ type LucidInstance = Awaited<ReturnType<typeof Lucid>>;
 interface GenesisState {
   isInitialized: boolean;
   isInitializing: boolean;
+  isChecking: boolean;
   platformAddress: string | null;
   error: string | null;
 }
@@ -16,15 +17,53 @@ interface GenesisState {
 interface UseGenesisReturn extends GenesisState {
   initializePlatform: (lucidInstance: LucidInstance, walletAddress: string) => Promise<void>;
   resetGenesis: () => void;
+  checkInitialization: () => Promise<boolean>;
 }
 
 export const useGenesis = (): UseGenesisReturn => {
   const [state, setState] = useState<GenesisState>({
     isInitialized: false,
     isInitializing: false,
+    isChecking: true, // Start as checking
     platformAddress: null,
     error: null,
   });
+
+  // Check if platform is already initialized (on mount)
+  const checkInitialization = useCallback(async (): Promise<boolean> => {
+    try {
+      const { data: existingPlatform, error: fetchError } = await supabase
+        .from('platform_config')
+        .select('settings_policy_id, settings_utxo_ref, admin_address')
+        .eq('id', 'main')
+        .maybeSingle();
+
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error('Error checking platform initialization:', fetchError);
+        return false;
+      }
+
+      const isInitialized = !!(existingPlatform?.settings_policy_id && existingPlatform?.settings_utxo_ref);
+
+      setState(prev => ({
+        ...prev,
+        isInitialized,
+        isChecking: false,
+        platformAddress: isInitialized ? existingPlatform.admin_address : null,
+      }));
+
+      return isInitialized;
+    } catch (err) {
+      console.error('Error checking initialization:', err);
+      setState(prev => ({ ...prev, isChecking: false }));
+      return false;
+    }
+  }, []);
+
+  // Auto-check on mount
+  useEffect(() => {
+    checkInitialization();
+  }, [checkInitialization]);
 
   const initializePlatform = async (lucidInstance: LucidInstance, walletAddress: string) => {
     setState(prev => ({ ...prev, isInitializing: true, error: null }));
@@ -80,6 +119,7 @@ export const useGenesis = (): UseGenesisReturn => {
       setState({
         isInitialized: true,
         isInitializing: false,
+        isChecking: false,
         platformAddress,
         error: null,
       });
@@ -100,6 +140,7 @@ export const useGenesis = (): UseGenesisReturn => {
     setState({
       isInitialized: false,
       isInitializing: false,
+      isChecking: false,
       platformAddress: null,
       error: null,
     });
@@ -109,5 +150,6 @@ export const useGenesis = (): UseGenesisReturn => {
     ...state,
     initializePlatform,
     resetGenesis,
+    checkInitialization,
   };
 };

@@ -38,8 +38,8 @@ interface SeatVisualizerProps {
 }
 
 const DEFAULT_TIERS: Tier[] = [
-  { id: 1, name: "Orchestra", price: 120, depth: 30, width: 80, pitch: 0.04, color: 0x2563eb, layout: 'rectangular' },
-  { id: 2, name: "Mezzanine", price: 65, depth: 25, width: 120, pitch: 0.12, color: 0x3b82f6, layout: 'fanned' }
+  { id: 1, name: "Orchestra", price: 120, depth: 30, width: 80, pitch: 0.04, color: 0x4d7650, layout: 'rectangular' },
+  { id: 2, name: "Mezzanine", price: 65, depth: 25, width: 120, pitch: 0.12, color: 0x6b9a6e, layout: 'fanned' }
 ];
 
 export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, readOnly = false }) => {
@@ -66,6 +66,7 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
   const [hoveredSeat, setHoveredSeat] = useState<{ tier: Tier; row: string; seat: string; price: number } | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [initRetry, setInitRetry] = useState(0);
 
   // Camera state refs (mutable for animation loop)
   const orbitRef = useRef({ lon: 200, lat: 30, radius: 200 });
@@ -103,7 +104,7 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
 
     // Stage
     const stageGeo = new THREE.BoxGeometry(stageWidth, stageHeight, 22);
-    const stageMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.8, metalness: 0.1 });
+    const stageMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.8, metalness: 0.1, transparent: true, opacity: 0.7 });
     const stage = new THREE.Mesh(stageGeo, stageMat);
     stage.position.set(0, stageHeight / 2, 0);
     stage.receiveShadow = true;
@@ -182,7 +183,7 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
       // Add section marker
       if (labelContainerRef.current) {
         const markerGeo = new THREE.SphereGeometry(1.8, 16, 16);
-        const markerMat = new THREE.MeshBasicMaterial({ color: 0x2563eb, transparent: true, opacity: 0.7 });
+        const markerMat = new THREE.MeshBasicMaterial({ color: 0x4d7650, transparent: true, opacity: 0.7 });
         const markerMesh = new THREE.Mesh(markerGeo, markerMat);
         markerMesh.position.set(0, maxY + 6, zStart + (rows * 2.5) / 2);
         (markerMesh as any).isMarker = true;
@@ -190,7 +191,7 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
         scene.add(markerMesh);
 
         const div = document.createElement('div');
-        div.className = 'absolute bg-slate-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold pointer-events-none -translate-x-1/2 opacity-0 transition-opacity whitespace-nowrap shadow-lg';
+        div.className = 'absolute bg-warm-900 text-white px-3 py-1.5 rounded-lg text-xs font-bold pointer-events-none -translate-x-1/2 opacity-0 transition-opacity whitespace-nowrap shadow-lg';
         div.innerText = tier.name;
         labelContainerRef.current.appendChild(div);
         markersRef.current.push({ mesh: markerMesh, element: div });
@@ -210,16 +211,16 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
     if (clientWidth === 0 || clientHeight === 0) {
       console.warn('SeatVisualizer: Container has 0 dimensions, waiting for layout...');
       const retryTimeout = setTimeout(() => {
-        // Force re-render to retry initialization
-        setTiers(prev => [...prev]);
+        // Increment retry counter to trigger effect re-run
+        setInitRetry(prev => prev + 1);
       }, 100);
       return () => clearTimeout(retryTimeout);
     }
 
     // Scene
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf1f5f9);
-    scene.fog = new THREE.Fog(0xf1f5f9, 250, 1200);
+    scene.background = new THREE.Color(0xffffff);
+    scene.fog = new THREE.Fog(0xffffff, 800, 2500);
     sceneRef.current = scene;
 
     // Camera
@@ -254,11 +255,10 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
 
     // Ground
     const groundGeo = new THREE.PlaneGeometry(2000, 2000);
-    const groundMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.9 });
+    const groundMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.1;
-    ground.receiveShadow = true;
     scene.add(ground);
 
     // Show onboarding if first visit
@@ -274,7 +274,7 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
         containerRef.current.removeChild(renderer.domElement);
       }
     };
-  }, []);
+  }, [initRetry]);
 
   // Rebuild venue when config changes
   useEffect(() => {
@@ -507,7 +507,7 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
   };
 
   const addTier = () => {
-    const colors = [0x2563eb, 0x3b82f6, 0x60a5fa, 0x1d4ed8, 0x1e40af];
+    const colors = [0x4d7650, 0x6b9a6e, 0x89b88c, 0x3d5f40, 0x2d4830];
     setTiers(prev => [...prev, {
       id: Date.now(),
       name: "New Section",
@@ -535,16 +535,16 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
   const applyPreset = (preset: string) => {
     const presets: Record<string, Tier[]> = {
       stadium: [
-        { id: Date.now(), name: "Lower Bowl", price: 150, depth: 40, width: 100, pitch: 0.06, color: 0x2563eb, layout: 'fanned' },
-        { id: Date.now() + 1, name: "Upper Bowl", price: 80, depth: 35, width: 140, pitch: 0.2, color: 0x3b82f6, layout: 'fanned' }
+        { id: Date.now(), name: "Lower Bowl", price: 150, depth: 40, width: 100, pitch: 0.06, color: 0x4d7650, layout: 'fanned' },
+        { id: Date.now() + 1, name: "Upper Bowl", price: 80, depth: 35, width: 140, pitch: 0.2, color: 0x6b9a6e, layout: 'fanned' }
       ],
       club: [
-        { id: Date.now(), name: "Floor", price: 50, depth: 40, width: 60, pitch: 0, color: 0x2563eb, layout: 'rectangular' },
-        { id: Date.now() + 1, name: "VIP", price: 200, depth: 15, width: 60, pitch: 0.1, color: 0x1d4ed8, layout: 'rectangular' }
+        { id: Date.now(), name: "Floor", price: 50, depth: 40, width: 60, pitch: 0, color: 0x4d7650, layout: 'rectangular' },
+        { id: Date.now() + 1, name: "VIP", price: 200, depth: 15, width: 60, pitch: 0.1, color: 0x3d5f40, layout: 'rectangular' }
       ],
       amphitheater: [
-        { id: Date.now(), name: "Orchestra", price: 120, depth: 30, width: 80, pitch: 0.04, color: 0x2563eb, layout: 'rectangular' },
-        { id: Date.now() + 1, name: "Mezzanine", price: 65, depth: 25, width: 120, pitch: 0.12, color: 0x3b82f6, layout: 'fanned' }
+        { id: Date.now(), name: "Orchestra", price: 120, depth: 30, width: 80, pitch: 0.04, color: 0x4d7650, layout: 'rectangular' },
+        { id: Date.now() + 1, name: "Mezzanine", price: 65, depth: 25, width: 120, pitch: 0.12, color: 0x6b9a6e, layout: 'fanned' }
       ]
     };
     setTiers(presets[preset] || presets.amphitheater);
@@ -557,7 +557,7 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
   };
 
   return (
-    <div className="relative w-full h-full bg-slate-100 overflow-hidden">
+    <div className="relative w-full h-full bg-white overflow-hidden">
       {/* Three.js Container */}
       <div ref={containerRef} className="absolute inset-0" />
 
@@ -568,26 +568,26 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
       {hoveredSeat && (
         <div
           ref={tooltipRef}
-          className="absolute pointer-events-none bg-slate-900/95 text-white px-4 py-3 rounded-xl text-sm z-50 -translate-x-1/2 -translate-y-[140%] shadow-xl border border-white/10 min-w-[160px]"
+          className="absolute pointer-events-none bg-warm-900/95 text-white px-4 py-3 rounded-xl text-sm z-50 -translate-x-1/2 -translate-y-[140%] shadow-xl border border-white/10 min-w-[160px]"
         >
-          <div className="text-[10px] uppercase text-blue-400 font-bold tracking-widest mb-1">
+          <div className="text-[10px] uppercase text-forest-400 font-bold tracking-widest mb-1">
             {hoveredSeat.tier.name}
           </div>
           <div className="font-bold">{hoveredSeat.row} - {hoveredSeat.seat}</div>
-          <div className="text-slate-400 font-semibold">{hoveredSeat.price} ADA</div>
-          <div className="mt-2 pt-2 border-t border-slate-700 text-[10px] text-slate-500">Click to select</div>
+          <div className="text-warm-400 font-semibold">{hoveredSeat.price} ADA</div>
+          <div className="mt-2 pt-2 border-t border-warm-700 text-[10px] text-warm-500">Click to select</div>
         </div>
       )}
 
       {/* Status Badge */}
-      <div className="absolute top-6 right-6 z-40 bg-white/95 backdrop-blur-md px-5 py-3.5 rounded-2xl border border-slate-200/80 shadow-lg pointer-events-none">
+      <div className="absolute top-6 right-6 z-40 bg-white/95 backdrop-blur-md px-5 py-3.5 rounded-2xl border border-warm-200/80 shadow-lg pointer-events-none">
         <div className="flex items-center gap-2.5 mb-1">
-          <span className={`w-2.5 h-2.5 rounded-full ${appMode === 'preview' ? 'bg-green-500' : 'bg-blue-600'}`} />
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+          <span className={`w-2.5 h-2.5 rounded-full ${appMode === 'preview' ? 'bg-forest-500' : 'bg-forest-600'}`} />
+          <span className="text-[10px] font-black uppercase tracking-widest text-warm-500">
             {appMode === 'preview' ? 'PREVIEW MODE' : 'DESIGN MODE'}
           </span>
         </div>
-        <h2 className="text-lg font-black tracking-tight text-slate-900">
+        <h2 className="text-lg font-black tracking-tight text-warm-900">
           {selectedSeat ? `${selectedSeat.tier.name} - ${selectedSeat.label.row} - ${selectedSeat.label.seat}` :
            appMode === 'preview' ? 'Select a seat' : 'Venue Designer'}
         </h2>
@@ -595,11 +595,11 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
 
       {/* Mode Controls */}
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-40 flex gap-4">
-        <div className="bg-slate-900/95 backdrop-blur-md p-1.5 rounded-2xl flex border border-white/10 shadow-xl">
+        <div className="bg-warm-900/95 backdrop-blur-md p-1.5 rounded-2xl flex border border-white/10 shadow-xl">
           <button
             onClick={() => handleAppModeChange('design')}
             className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wide transition-all ${
-              appMode === 'design' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
+              appMode === 'design' ? 'bg-forest-600 text-white shadow-lg' : 'text-warm-400 hover:text-white'
             }`}
           >
             Design
@@ -607,18 +607,18 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
           <button
             onClick={() => handleAppModeChange('preview')}
             className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wide transition-all ${
-              appMode === 'preview' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
+              appMode === 'preview' ? 'bg-forest-600 text-white shadow-lg' : 'text-warm-400 hover:text-white'
             }`}
           >
             Preview
           </button>
         </div>
 
-        <div className="bg-slate-900/95 backdrop-blur-md p-1.5 rounded-2xl flex border border-white/10 shadow-xl">
+        <div className="bg-warm-900/95 backdrop-blur-md p-1.5 rounded-2xl flex border border-white/10 shadow-xl">
           <button
             onClick={() => setViewMode('orbital')}
             className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wide transition-all ${
-              viewMode === 'orbital' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
+              viewMode === 'orbital' ? 'bg-forest-600 text-white shadow-lg' : 'text-warm-400 hover:text-white'
             }`}
           >
             Orbit
@@ -626,7 +626,7 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
           <button
             onClick={() => setViewMode('pov')}
             className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wide transition-all ${
-              viewMode === 'pov' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
+              viewMode === 'pov' ? 'bg-forest-600 text-white shadow-lg' : 'text-warm-400 hover:text-white'
             }`}
           >
             Seat View
@@ -636,11 +636,11 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
 
       {/* Design Sidebar */}
       {!readOnly && (
-        <div className={`absolute top-0 left-0 h-full w-[340px] bg-white border-r border-slate-200 shadow-xl z-50 flex flex-col transition-transform duration-300 ${sidebarCollapsed ? '-translate-x-full' : ''}`}>
+        <div className={`absolute top-0 left-0 h-full w-[340px] bg-white border-r border-warm-200 shadow-xl z-50 flex flex-col transition-transform duration-300 ${sidebarCollapsed ? '-translate-x-full' : ''}`}>
           {/* Toggle Button */}
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="absolute -right-12 top-6 w-12 h-12 bg-white border border-slate-200 border-l-0 rounded-r-xl flex items-center justify-center text-slate-500 hover:text-blue-600 hover:bg-slate-50 transition shadow-md"
+            className="absolute -right-12 top-6 w-12 h-12 bg-white border border-warm-200 border-l-0 rounded-r-xl flex items-center justify-center text-warm-500 hover:text-forest-600 hover:bg-warm-50 transition shadow-md"
           >
             <svg className={`w-5 h-5 transition-transform ${sidebarCollapsed ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="m15 18-6-6 6-6" />
@@ -648,12 +648,12 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
           </button>
 
           {/* Header */}
-          <div className="p-6 pb-4 border-b border-slate-100">
+          <div className="p-6 pb-4 border-b border-warm-100">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black text-lg shadow-lg">S</div>
+              <div className="w-11 h-11 bg-forest-600 rounded-xl flex items-center justify-center text-white font-black text-lg shadow-lg">S</div>
               <div>
-                <h1 className="text-lg font-black tracking-tight text-slate-900">SeatMint</h1>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Venue Designer</span>
+                <h1 className="text-lg font-black tracking-tight text-warm-900">SeatMint</h1>
+                <span className="text-[10px] font-bold text-warm-400 uppercase tracking-widest">Venue Designer</span>
               </div>
             </div>
           </div>
@@ -662,10 +662,10 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
           <div className="flex-1 overflow-y-auto p-6 pt-4">
             {/* Preset Selector */}
             <div className="mb-6">
-              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-2">Venue Template</label>
+              <label className="block text-[11px] font-bold text-warm-500 uppercase tracking-wide mb-2">Venue Template</label>
               <select
                 onChange={(e) => applyPreset(e.target.value)}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-warm-200 rounded-xl px-3 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-forest-500"
               >
                 <option value="amphitheater">Amphitheater (Mixed)</option>
                 <option value="stadium">Stadium (Fanned)</option>
@@ -675,9 +675,9 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
 
             {/* Stage Width */}
             <div className="mb-6">
-              <div className="flex justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-2">
+              <div className="flex justify-between text-[11px] font-bold text-warm-500 uppercase tracking-wide mb-2">
                 <span>Stage Width</span>
-                <span className="text-blue-600">{stageWidth}m</span>
+                <span className="text-forest-600">{stageWidth}m</span>
               </div>
               <input
                 type="range"
@@ -685,32 +685,32 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
                 max="80"
                 value={stageWidth}
                 onChange={(e) => setStageWidth(parseInt(e.target.value))}
-                className="w-full accent-blue-600"
+                className="w-full accent-forest-600"
               />
             </div>
 
             {/* Sections */}
             <div className="mb-6">
               <div className="flex justify-between items-center mb-3">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Seating Sections</span>
-                <button onClick={addTier} className="text-blue-600 text-xs font-bold hover:bg-blue-50 px-2 py-1 rounded-lg transition">
+                <span className="text-[11px] font-bold text-warm-500 uppercase tracking-wide">Seating Sections</span>
+                <button onClick={addTier} className="text-forest-600 text-xs font-bold hover:bg-forest-50 px-2 py-1 rounded-lg transition">
                   + Add
                 </button>
               </div>
 
               <div className="space-y-3">
                 {tiers.map((tier, i) => (
-                  <div key={tier.id} className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-                    <div className="flex justify-between items-center mb-3 pb-3 border-b border-slate-200">
+                  <div key={tier.id} className="bg-warm-50 border border-warm-200 rounded-xl p-4">
+                    <div className="flex justify-between items-center mb-3 pb-3 border-b border-warm-200">
                       <input
                         type="text"
                         value={tier.name}
                         onChange={(e) => updateTier(i, { name: e.target.value })}
-                        className="font-bold text-sm bg-transparent border-none focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 -ml-2"
+                        className="font-bold text-sm bg-transparent border-none focus:outline-none focus:bg-white focus:ring-2 focus:ring-forest-500 rounded px-2 py-1 -ml-2"
                       />
                       <button
                         onClick={() => removeTier(i)}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition"
+                        className="w-8 h-8 flex items-center justify-center rounded-lg text-warm-400 hover:text-terracotta-500 hover:bg-terracotta-50 transition"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -720,32 +720,32 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
 
                     <div className="grid grid-cols-2 gap-3 mb-3">
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Layout</label>
+                        <label className="block text-[10px] font-bold text-warm-400 uppercase mb-1">Layout</label>
                         <select
                           value={tier.layout}
                           onChange={(e) => updateTier(i, { layout: e.target.value as 'fanned' | 'rectangular' })}
-                          className="w-full border border-slate-200 rounded-lg px-2 py-2 text-xs font-semibold"
+                          className="w-full border border-warm-200 rounded-lg px-2 py-2 text-xs font-semibold"
                         >
                           <option value="fanned">Fanned</option>
                           <option value="rectangular">Rectangular</option>
                         </select>
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Price (ADA)</label>
+                        <label className="block text-[10px] font-bold text-warm-400 uppercase mb-1">Price (ADA)</label>
                         <input
                           type="number"
                           value={tier.price}
                           onChange={(e) => updateTier(i, { price: parseInt(e.target.value) || 0 })}
-                          className="w-full border border-slate-200 rounded-lg px-2 py-2 text-xs font-semibold"
+                          className="w-full border border-warm-200 rounded-lg px-2 py-2 text-xs font-semibold"
                         />
                       </div>
                     </div>
 
                     <div className="space-y-3">
                       <div>
-                        <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase mb-1">
+                        <div className="flex justify-between text-[10px] font-bold text-warm-400 uppercase mb-1">
                           <span>Depth</span>
-                          <span className="text-blue-600">{tier.depth}m</span>
+                          <span className="text-forest-600">{tier.depth}m</span>
                         </div>
                         <input
                           type="range"
@@ -753,13 +753,13 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
                           max="80"
                           value={tier.depth}
                           onChange={(e) => updateTier(i, { depth: parseInt(e.target.value) })}
-                          className="w-full accent-blue-600"
+                          className="w-full accent-forest-600"
                         />
                       </div>
                       <div>
-                        <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase mb-1">
+                        <div className="flex justify-between text-[10px] font-bold text-warm-400 uppercase mb-1">
                           <span>Incline</span>
-                          <span className="text-blue-600">{Math.round(tier.pitch * 100)}%</span>
+                          <span className="text-forest-600">{Math.round(tier.pitch * 100)}%</span>
                         </div>
                         <input
                           type="range"
@@ -768,13 +768,13 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
                           step="0.01"
                           value={tier.pitch}
                           onChange={(e) => updateTier(i, { pitch: parseFloat(e.target.value) })}
-                          className="w-full accent-blue-600"
+                          className="w-full accent-forest-600"
                         />
                       </div>
                       <div>
-                        <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase mb-1">
+                        <div className="flex justify-between text-[10px] font-bold text-warm-400 uppercase mb-1">
                           <span>Spread</span>
-                          <span className="text-blue-600">{tier.width}{tier.layout === 'fanned' ? '°' : 'm'}</span>
+                          <span className="text-forest-600">{tier.width}{tier.layout === 'fanned' ? '°' : 'm'}</span>
                         </div>
                         <input
                           type="range"
@@ -782,7 +782,7 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
                           max="240"
                           value={tier.width}
                           onChange={(e) => updateTier(i, { width: parseInt(e.target.value) })}
-                          className="w-full accent-blue-600"
+                          className="w-full accent-forest-600"
                         />
                       </div>
                     </div>
@@ -794,22 +794,22 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
             {/* Obstructions */}
             <div>
               <div className="flex justify-between items-center mb-3">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Obstructions</span>
-                <button onClick={addObstruction} className="text-blue-600 text-xs font-bold hover:bg-blue-50 px-2 py-1 rounded-lg transition">
+                <span className="text-[11px] font-bold text-warm-500 uppercase tracking-wide">Obstructions</span>
+                <button onClick={addObstruction} className="text-forest-600 text-xs font-bold hover:bg-forest-50 px-2 py-1 rounded-lg transition">
                   + Add Pillar
                 </button>
               </div>
               {obstructions.length === 0 ? (
-                <p className="text-xs text-slate-400 text-center py-4">No obstructions added</p>
+                <p className="text-xs text-warm-400 text-center py-4">No obstructions added</p>
               ) : (
                 <div className="space-y-3">
                   {obstructions.map((obs, j) => (
-                    <div key={j} className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                    <div key={j} className="bg-warm-50 border border-warm-200 rounded-xl p-4">
                       <div className="flex justify-between items-center mb-3">
-                        <span className="font-bold text-sm text-slate-700">Pillar {j + 1}</span>
+                        <span className="font-bold text-sm text-warm-700">Pillar {j + 1}</span>
                         <button
                           onClick={() => setObstructions(prev => prev.filter((_, i) => i !== j))}
-                          className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition"
+                          className="w-8 h-8 flex items-center justify-center rounded-lg text-warm-400 hover:text-terracotta-500 hover:bg-terracotta-50 transition"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -818,25 +818,25 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">X: {obs.x}m</label>
+                          <label className="block text-[10px] font-bold text-warm-400 uppercase mb-1">X: {obs.x}m</label>
                           <input
                             type="range"
                             min="-100"
                             max="100"
                             value={obs.x}
                             onChange={(e) => setObstructions(prev => prev.map((o, i) => i === j ? { ...o, x: parseInt(e.target.value) } : o))}
-                            className="w-full accent-blue-600"
+                            className="w-full accent-forest-600"
                           />
                         </div>
                         <div>
-                          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Z: {obs.z}m</label>
+                          <label className="block text-[10px] font-bold text-warm-400 uppercase mb-1">Z: {obs.z}m</label>
                           <input
                             type="range"
                             min="0"
                             max="300"
                             value={obs.z}
                             onChange={(e) => setObstructions(prev => prev.map((o, i) => i === j ? { ...o, z: parseInt(e.target.value) } : o))}
-                            className="w-full accent-blue-600"
+                            className="w-full accent-forest-600"
                           />
                         </div>
                       </div>
@@ -855,7 +855,7 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
           <div className="p-8 pt-6 min-h-full flex flex-col">
             <button
               onClick={closeBuyPanel}
-              className="absolute top-5 right-5 w-10 h-10 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+              className="absolute top-5 right-5 w-10 h-10 flex items-center justify-center rounded-xl text-warm-400 hover:text-warm-600 hover:bg-warm-100 transition"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -863,27 +863,27 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
             </button>
 
             <div className="text-center mb-8 pt-8">
-              <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-5">
+              <div className="w-16 h-16 bg-forest-100 text-forest-600 rounded-2xl flex items-center justify-center mx-auto mb-5">
                 <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
                 </svg>
               </div>
-              <h3 className="text-2xl font-black text-slate-900 mb-2">Confirm Selection</h3>
-              <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">
+              <h3 className="text-2xl font-black text-warm-900 mb-2">Confirm Selection</h3>
+              <p className="text-sm font-bold text-warm-500 uppercase tracking-wider">
                 {selectedSeat.tier.name} - {selectedSeat.label.row} - {selectedSeat.label.seat}
               </p>
             </div>
 
-            <div className="bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 rounded-2xl p-6 mb-6">
-              <div className="flex items-center gap-4 mb-4 pb-4 border-b border-slate-200">
-                <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center">
+            <div className="bg-gradient-to-br from-warm-50/30 to-warm-100/30 border border-warm-200 rounded-2xl p-6 mb-6">
+              <div className="flex items-center gap-4 mb-4 pb-4 border-b border-warm-200">
+                <div className="w-12 h-12 bg-forest-600 rounded-xl flex items-center justify-center">
                   <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
                   </svg>
                 </div>
                 <div>
-                  <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Your Seat</div>
-                  <div className="text-lg font-black text-slate-900">
+                  <div className="text-xs font-bold text-warm-400 uppercase tracking-wider">Your Seat</div>
+                  <div className="text-lg font-black text-warm-900">
                     {selectedSeat.tier.name} - {selectedSeat.label.row} - {selectedSeat.label.seat}
                   </div>
                 </div>
@@ -891,19 +891,19 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
 
               <div className="space-y-3">
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-500 font-medium">Ticket Price</span>
-                  <span className="font-bold text-slate-900">{selectedSeat.tier.price} ADA</span>
+                  <span className="text-warm-500 font-medium">Ticket Price</span>
+                  <span className="font-bold text-warm-900">{selectedSeat.tier.price} ADA</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-500 font-medium">Platform Fee</span>
-                  <span className="font-semibold text-slate-600">2 ADA</span>
+                  <span className="text-warm-500 font-medium">Platform Fee</span>
+                  <span className="font-semibold text-warm-600">2 ADA</span>
                 </div>
               </div>
             </div>
 
-            <div className="bg-slate-900 text-white rounded-2xl p-5 mb-8">
+            <div className="bg-warm-900 text-white rounded-2xl p-5 mb-8">
               <div className="flex justify-between items-center">
-                <span className="font-bold text-slate-300">Total</span>
+                <span className="font-bold text-warm-300">Total</span>
                 <span className="text-2xl font-black">{selectedSeat.tier.price + 2} ADA</span>
               </div>
             </div>
@@ -911,7 +911,7 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
             <div className="flex gap-3 mt-auto">
               <button
                 onClick={closeBuyPanel}
-                className="flex-1 px-6 py-4 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition"
+                className="flex-1 px-6 py-4 rounded-xl font-bold text-warm-600 bg-warm-100 hover:bg-warm-200 transition"
               >
                 Cancel
               </button>
@@ -920,13 +920,13 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
                   alert('In production, this would submit to your Cardano wallet for signing.');
                   closeBuyPanel();
                 }}
-                className="flex-1 px-6 py-4 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-lg transition"
+                className="flex-1 px-6 py-4 rounded-xl font-bold text-white bg-forest-600 hover:bg-forest-700 shadow-lg transition"
               >
                 Mint Ticket
               </button>
             </div>
 
-            <p className="text-center text-xs text-slate-400 mt-6">
+            <p className="text-center text-xs text-warm-400 mt-6">
               This will create an NFT ticket on the Cardano blockchain
             </p>
           </div>
@@ -935,34 +935,34 @@ export const SeatVisualizer: React.FC<SeatVisualizerProps> = ({ onSeatSelect, re
 
       {/* Onboarding Overlay */}
       {showOnboarding && (
-        <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center">
+        <div className="absolute inset-0 bg-warm-900/60 backdrop-blur-sm z-[200] flex items-center justify-center">
           <div className="bg-white rounded-2xl p-8 max-w-md text-center shadow-2xl">
-            <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-5">
+            <div className="w-16 h-16 bg-forest-100 text-forest-600 rounded-2xl flex items-center justify-center mx-auto mb-5">
               <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
             </div>
-            <h3 className="text-xl font-black text-slate-900 mb-2">Welcome to Venue Designer</h3>
-            <p className="text-slate-500 text-sm mb-6">
+            <h3 className="text-xl font-black text-warm-900 mb-2">Welcome to Venue Designer</h3>
+            <p className="text-warm-500 text-sm mb-6">
               Design your venue layout with sections, stage, and seating. Switch to <strong>Preview</strong> mode to test the buyer experience.
             </p>
-            <div className="flex flex-col gap-3 text-left bg-slate-50 rounded-xl p-4 mb-6">
+            <div className="flex flex-col gap-3 text-left bg-warm-50 rounded-xl p-4 mb-6">
               <div className="flex items-center gap-3 text-sm">
-                <span className="w-6 h-6 bg-blue-600 text-white rounded-lg flex items-center justify-center text-xs font-bold">1</span>
-                <span className="text-slate-600">Configure sections in the sidebar</span>
+                <span className="w-6 h-6 bg-forest-600 text-white rounded-lg flex items-center justify-center text-xs font-bold">1</span>
+                <span className="text-warm-600">Configure sections in the sidebar</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
-                <span className="w-6 h-6 bg-blue-600 text-white rounded-lg flex items-center justify-center text-xs font-bold">2</span>
-                <span className="text-slate-600">Drag to orbit around your venue</span>
+                <span className="w-6 h-6 bg-forest-600 text-white rounded-lg flex items-center justify-center text-xs font-bold">2</span>
+                <span className="text-warm-600">Drag to orbit around your venue</span>
               </div>
               <div className="flex items-center gap-3 text-sm">
-                <span className="w-6 h-6 bg-blue-600 text-white rounded-lg flex items-center justify-center text-xs font-bold">3</span>
-                <span className="text-slate-600">Click seats to view from that position</span>
+                <span className="w-6 h-6 bg-forest-600 text-white rounded-lg flex items-center justify-center text-xs font-bold">3</span>
+                <span className="text-warm-600">Click seats to view from that position</span>
               </div>
             </div>
             <button
               onClick={dismissOnboarding}
-              className="w-full py-4 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 transition shadow-lg"
+              className="w-full py-4 rounded-xl font-bold text-white bg-forest-600 hover:bg-forest-700 transition shadow-lg"
             >
               Get Started
             </button>
