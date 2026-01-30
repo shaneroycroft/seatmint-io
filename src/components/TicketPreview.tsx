@@ -13,6 +13,7 @@ interface TicketPreviewProps {
   ticketId?: string;
   interactive?: boolean;
   qrCycleSeconds?: number;
+  compact?: boolean;
 }
 
 const TIER_STYLES: Record<string, { bg: string; gradient: string; isVip?: boolean }> = {
@@ -62,6 +63,7 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({
   ticketId = 'TKT-001',
   interactive = true,
   qrCycleSeconds = 30,
+  compact = false,
 }) => {
   const [isFlipped, setIsFlipped] = useState(false);
   const [cycleProgress, setCycleProgress] = useState(100);
@@ -147,9 +149,9 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({
             style={{ backfaceVisibility: 'hidden' }}
           >
             <div
-              className={`relative aspect-[16/9] rounded-2xl p-5 flex flex-col justify-between text-white overflow-hidden shadow-xl min-h-[180px] ${
-                bannerImageUrl ? '' : `bg-gradient-to-br ${style.gradient}`
-              }`}
+              className={`relative aspect-[16/9] rounded-2xl flex flex-col justify-between text-white overflow-hidden shadow-xl ${
+                compact ? 'p-3 min-h-[100px]' : 'p-5 min-h-[180px]'
+              } ${bannerImageUrl ? '' : `bg-gradient-to-br ${style.gradient}`}`}
               style={bannerImageUrl ? { background: `url(${bannerImageUrl}) center/cover` } : undefined}
             >
               {/* VIP Special Texture Overlay */}
@@ -186,14 +188,18 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({
               )}
 
               {/* Watermark */}
-              <div className="absolute -top-5 -right-8 text-[120px] font-black opacity-[0.08] rotate-12 select-none pointer-events-none tracking-tighter">
+              <div className={`absolute -top-5 -right-8 font-black opacity-[0.08] rotate-12 select-none pointer-events-none tracking-tighter ${
+                compact ? 'text-[60px]' : 'text-[120px]'
+              }`}>
                 {isVip ? 'VIP' : 'TICKET'}
               </div>
 
               {/* VIP Gold Sheen Text */}
               {isVip && !bannerImageUrl && (
                 <div
-                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-6xl font-black tracking-wider select-none pointer-events-none"
+                  className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 font-black tracking-wider select-none pointer-events-none ${
+                    compact ? 'text-3xl' : 'text-6xl'
+                  }`}
                   style={{
                     background: 'linear-gradient(135deg, #d4af37 0%, #f9f295 25%, #d4af37 50%, #f9f295 75%, #d4af37 100%)',
                     backgroundSize: '200% 200%',
@@ -210,29 +216,37 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({
 
               {/* Top Row - Badges */}
               <div className="flex justify-between items-start relative z-10">
-                <div className={`backdrop-blur-md px-3 py-1.5 rounded-lg text-[10px] font-extrabold uppercase tracking-widest ${
-                  isVip ? 'bg-sand-500/30 text-sand-200 border border-sand-400/30' : 'bg-white/20 italic'
-                }`}>
+                <div className={`backdrop-blur-md rounded-lg font-extrabold uppercase tracking-widest ${
+                  compact ? 'px-2 py-1 text-[8px]' : 'px-3 py-1.5 text-[10px]'
+                } ${isVip ? 'bg-sand-500/30 text-sand-200 border border-sand-400/30' : 'bg-white/20 italic'}`}>
                   {displayTier}
                 </div>
-                <div className="bg-white/15 backdrop-blur-md px-2 py-1 rounded-md text-[9px] font-semibold tracking-wide">
+                <div className={`bg-white/15 backdrop-blur-md rounded-md font-semibold tracking-wide ${
+                  compact ? 'px-1.5 py-0.5 text-[7px]' : 'px-2 py-1 text-[9px]'
+                }`}>
                   NFT
                 </div>
               </div>
 
               {/* Bottom Row - Event Info */}
               <div className="relative z-10">
-                <h4 className="text-xl font-black leading-tight mb-1 truncate drop-shadow-lg">
+                <h4 className={`font-black leading-tight mb-1 truncate drop-shadow-lg ${
+                  compact ? 'text-sm' : 'text-xl'
+                }`}>
                   {displayName}
                 </h4>
-                <p className="text-xs font-medium opacity-90 uppercase tracking-wider">
+                <p className={`font-medium opacity-90 uppercase tracking-wider ${
+                  compact ? 'text-[9px]' : 'text-xs'
+                }`}>
                   {displayVenue}
                 </p>
               </div>
 
               {/* Flip hint */}
               {interactive && (
-                <div className="absolute bottom-2 right-2 text-[9px] text-white/40 font-medium">
+                <div className={`absolute right-2 text-white/40 font-medium ${
+                  compact ? 'bottom-1 text-[7px]' : 'bottom-2 text-[9px]'
+                }`}>
                   Tap to flip
                 </div>
               )}
@@ -247,9 +261,9 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({
               transform: 'rotateY(180deg)'
             }}
           >
-            <div className={`relative aspect-[16/9] rounded-2xl p-5 flex flex-col text-white overflow-hidden shadow-xl min-h-[180px] ${
-              isVip ? 'bg-warm-900' : 'bg-warm-800'
-            }`}>
+            <div className={`relative aspect-[16/9] rounded-2xl flex flex-col text-white overflow-hidden shadow-xl ${
+              compact ? 'p-3 min-h-[100px]' : 'p-5 min-h-[180px]'
+            } ${isVip ? 'bg-warm-900' : 'bg-warm-800'}`}>
               {/* Texture for VIP */}
               {isVip && (
                 <div
@@ -261,53 +275,55 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({
               )}
 
               {/* Content Grid */}
-              <div className="flex h-full gap-4 relative z-10">
+              <div className={`flex h-full relative z-10 ${compact ? 'gap-2' : 'gap-4'}`}>
                 {/* QR Code Section */}
                 <div className="flex flex-col items-center justify-center">
-                  <div className="bg-white p-2 rounded-lg shadow-lg">
+                  <div className={`bg-white rounded-lg shadow-lg ${compact ? 'p-1' : 'p-2'}`}>
                     <img
                       src={qrCodeUrl}
                       alt="Ticket QR Code"
-                      className="w-24 h-24"
+                      className={compact ? 'w-14 h-14' : 'w-24 h-24'}
                     />
                   </div>
                   {/* Cycle Progress Bar */}
-                  <div className="mt-2 w-24">
+                  <div className={`mt-1 ${compact ? 'w-14' : 'w-24 mt-2'}`}>
                     <div className="h-1 bg-white/20 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-forest-400 transition-all duration-100"
                         style={{ width: `${cycleProgress}%` }}
                       />
                     </div>
-                    <p className="text-[8px] text-white/50 text-center mt-1">
-                      Code refreshes for security
-                    </p>
+                    {!compact && (
+                      <p className="text-[8px] text-white/50 text-center mt-1">
+                        Code refreshes for security
+                      </p>
+                    )}
                   </div>
                 </div>
 
                 {/* Info Section */}
                 <div className="flex-1 flex flex-col justify-between py-1">
                   <div>
-                    <p className="text-[10px] font-semibold text-white/50 uppercase tracking-widest mb-1">Venue</p>
-                    <p className="text-sm font-semibold text-white mb-0.5">{displayVenue}</p>
-                    <p className="text-[11px] text-white/70 leading-tight">{venueAddress}</p>
+                    <p className={`font-semibold text-white/50 uppercase tracking-widest ${compact ? 'text-[8px] mb-0.5' : 'text-[10px] mb-1'}`}>Venue</p>
+                    <p className={`font-semibold text-white ${compact ? 'text-xs mb-0' : 'text-sm mb-0.5'}`}>{displayVenue}</p>
+                    {!compact && <p className="text-[11px] text-white/70 leading-tight">{venueAddress}</p>}
                   </div>
 
-                  <div className="flex gap-4">
+                  <div className={`flex ${compact ? 'gap-2' : 'gap-4'}`}>
                     <div>
-                      <p className="text-[10px] font-semibold text-white/50 uppercase tracking-widest">Date</p>
-                      <p className="text-xs font-semibold text-white">{formatDate(eventDate)}</p>
+                      <p className={`font-semibold text-white/50 uppercase tracking-widest ${compact ? 'text-[7px]' : 'text-[10px]'}`}>Date</p>
+                      <p className={`font-semibold text-white ${compact ? 'text-[9px]' : 'text-xs'}`}>{formatDate(eventDate)}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-semibold text-white/50 uppercase tracking-widest">Time</p>
-                      <p className="text-xs font-semibold text-white">{formatTime(eventDate) || 'TBD'}</p>
+                      <p className={`font-semibold text-white/50 uppercase tracking-widest ${compact ? 'text-[7px]' : 'text-[10px]'}`}>Time</p>
+                      <p className={`font-semibold text-white ${compact ? 'text-[9px]' : 'text-xs'}`}>{formatTime(eventDate) || 'TBD'}</p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-forest-500 animate-pulse" />
-                    <span className="text-[10px] text-white/60 font-medium">
-                      ID: {ticketId} • Token: {currentToken}
+                    <div className={`rounded-full bg-forest-500 animate-pulse ${compact ? 'w-1.5 h-1.5' : 'w-2 h-2'}`} />
+                    <span className={`text-white/60 font-medium ${compact ? 'text-[8px]' : 'text-[10px]'}`}>
+                      ID: {ticketId} {!compact && `• Token: ${currentToken}`}
                     </span>
                   </div>
                 </div>
@@ -315,7 +331,9 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({
 
               {/* Flip hint */}
               {interactive && (
-                <div className="absolute bottom-2 right-2 text-[9px] text-white/40 font-medium">
+                <div className={`absolute right-2 text-white/40 font-medium ${
+                  compact ? 'bottom-1 text-[7px]' : 'bottom-2 text-[9px]'
+                }`}>
                   Tap to flip
                 </div>
               )}
@@ -325,37 +343,37 @@ export const TicketPreview: React.FC<TicketPreviewProps> = ({
       </div>
 
       {/* Ticket Details Below Card */}
-      <div className="mt-4 flex justify-between items-end">
+      <div className={`flex justify-between items-end ${compact ? 'mt-2' : 'mt-4'}`}>
         <div>
-          <p className="text-[10px] font-semibold text-warm-400 uppercase tracking-widest mb-1">
+          <p className={`font-semibold text-warm-400 uppercase tracking-widest ${compact ? 'text-[8px] mb-0.5' : 'text-[10px] mb-1'}`}>
             {formatDate(eventDate)}
           </p>
-          <p className="text-sm font-semibold text-warm-600">
+          <p className={`font-semibold text-warm-600 ${compact ? 'text-xs' : 'text-sm'}`}>
             {organizerName}
           </p>
         </div>
         <div className="text-right">
-          <p className={`text-2xl font-black tracking-tighter ${isVip ? 'text-sand-600' : 'text-warm-900'}`}>
+          <p className={`font-black tracking-tighter ${compact ? 'text-lg' : 'text-2xl'} ${isVip ? 'text-sand-600' : 'text-warm-900'}`}>
             ₳{displayPrice}
           </p>
         </div>
       </div>
 
       {/* Decorative Divider */}
-      <div className="mt-4 border-t-2 border-dashed border-warm-200 relative">
-        <div className="absolute -left-3 -top-2 w-4 h-4 bg-warm-50 rounded-full" />
-        <div className="absolute -right-3 -top-2 w-4 h-4 bg-warm-50 rounded-full" />
+      <div className={`border-t-2 border-dashed border-warm-200 relative ${compact ? 'mt-2' : 'mt-4'}`}>
+        <div className={`absolute -top-2 bg-warm-50 rounded-full ${compact ? '-left-2 w-3 h-3' : '-left-3 w-4 h-4'}`} />
+        <div className={`absolute -top-2 bg-warm-50 rounded-full ${compact ? '-right-2 w-3 h-3' : '-right-3 w-4 h-4'}`} />
       </div>
 
       {/* Bottom Info */}
-      <div className="mt-4 flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-forest-500" />
-          <span className="text-[11px] text-warm-500 font-medium">
+      <div className={`flex justify-between items-center ${compact ? 'mt-2' : 'mt-4'}`}>
+        <div className={`flex items-center ${compact ? 'gap-1' : 'gap-2'}`}>
+          <div className={`rounded-full bg-forest-500 ${compact ? 'w-1.5 h-1.5' : 'w-2 h-2'}`} />
+          <span className={`text-warm-500 font-medium ${compact ? 'text-[9px]' : 'text-[11px]'}`}>
             Verified on Cardano
           </span>
         </div>
-        <span className="text-[10px] text-warm-400 font-semibold tracking-wider">
+        <span className={`text-warm-400 font-semibold tracking-wider ${compact ? 'text-[8px]' : 'text-[10px]'}`}>
           SEATMINT
         </span>
       </div>

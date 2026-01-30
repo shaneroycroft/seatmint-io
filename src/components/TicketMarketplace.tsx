@@ -432,13 +432,13 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 p-4">
             {myTickets.map((ticket) => (
               <div
                 key={ticket.id}
                 onClick={() => setSelectedTicket(ticket)}
                 className={`cursor-pointer transition-all ${
-                  selectedTicket?.id === ticket.id ? 'ring-2 ring-forest-500 rounded-2xl' : ''
+                  selectedTicket?.id === ticket.id ? 'ring-2 ring-forest-500 rounded-xl' : ''
                 }`}
               >
                 <TicketPreview
@@ -451,11 +451,12 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
                   ticketId={`${ticket.nft_asset_name?.slice(0, 8) || ticket.id.slice(0, 8)}`}
                   interactive={true}
                   qrCycleSeconds={30}
+                  compact={true}
                 />
                 {ticket.is_listed && (
-                  <div className="mt-2 text-center">
-                    <span className="bg-sand-100 text-sand-700 px-3 py-1 rounded-full text-xs font-semibold">
-                      Listed for ₳{ticket.resale_price}
+                  <div className="mt-1.5 text-center">
+                    <span className="bg-sand-100 text-sand-700 px-2 py-0.5 rounded-full text-[10px] font-semibold">
+                      Listed ₳{ticket.resale_price}
                     </span>
                   </div>
                 )}

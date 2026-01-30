@@ -856,8 +856,41 @@ export async function listTicketForResale(
   }
 
   if (!updatedTicket) {
-    console.error('No ticket found with nft_asset_name:', params.ticketAssetName);
-    console.log('The ticket may not exist in the database yet. Try syncing your wallet first.');
+    // Ticket doesn't exist in DB - create it now
+    console.log('No ticket found with nft_asset_name, creating record:', params.ticketAssetName);
+
+    // Get the next ticket number for this tier
+    const { data: maxTicketData } = await supabase
+      .from('tickets')
+      .select('ticket_number')
+      .eq('tier_id', tier.id)
+      .order('ticket_number', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const nextTicketNumber = (maxTicketData?.ticket_number || 0) + 1;
+
+    const { data: newTicket, error: insertError } = await supabase
+      .from('tickets')
+      .insert({
+        event_id: params.eventId,
+        tier_id: tier.id,
+        ticket_number: nextTicketNumber,
+        nft_asset_name: params.ticketAssetName,
+        current_owner_address: sellerAddress,
+        status: 'listed',
+        resale_price: Math.floor(params.priceAda * 1_000_000),
+        listing_utxo_ref: listingRef,
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error('Failed to create ticket record:', insertError);
+      // Non-fatal - ticket is listed on-chain, just won't show in UI until synced
+    } else {
+      console.log('Created new ticket record:', newTicket.id, '-> status:', newTicket.status);
+    }
   } else {
     console.log('Ticket updated successfully:', updatedTicket.id, '-> status:', updatedTicket.status);
   }

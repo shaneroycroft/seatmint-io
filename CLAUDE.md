@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **SeatMint** is a decentralized ticketing platform on Cardano using **Plutus V3** (Aiken v1.1.21) and **Lucid Evolution v0.4.29**.
 
-- **Frontend**: React (TypeScript) + Vite + Tailwind CSS v4
+- **Frontend**: React (TypeScript) + Vite + Tailwind CSS v4 (requires `@config` directive)
 - **Database**: Supabase (events, tickets, ticket_tiers, secondary_listings, platform_config tables)
 - **Blockchain**: Cardano Preview Testnet
 - **Validation Logic**: Aiken Smart Contracts in `contracts/`
@@ -22,6 +22,15 @@ VITE_NETWORK=Preview
 VITE_SUPABASE_URL=<your-supabase-url>
 VITE_SUPABASE_API_KEY=<your-supabase-anon-key>
 ```
+
+## Tailwind CSS v4 Configuration
+
+Custom colors (forest, sand, terracotta, warm) are defined in `tailwind.config.js`. For Tailwind v4 to load them, `src/index.css` must include:
+```css
+@import "tailwindcss";
+@config "../tailwind.config.js";
+```
+Without the `@config` directive, custom colors will not render.
 
 ## Development Commands
 
@@ -162,6 +171,7 @@ Generate N unique asset names, add all to one `mintAssets` dictionary, submit as
 | Repeated 404s from awaitTx | Transaction rejected (double-spend or validation failure) | Check if UTxO was already spent; refresh UTxO set before building |
 | Supabase 406 Not Acceptable | Using `.single()` when 0 or >1 rows | Use `.maybeSingle()` for queries that may return no results |
 | ticket_number NOT NULL constraint | Insert missing ticket_number field | Query max ticket_number for tier, increment by 1 |
+| Listed ticket not showing in UI | Ticket record doesn't exist in DB | `listTicketForResale` now auto-creates record if missing; also try "Sync Wallet" |
 
 ### Ghost Reference Pattern
 
@@ -216,6 +226,8 @@ const saleUTxO = saleUTxOs.find(utxo => {
 
 - **tickets.current_owner_address**: Must exactly match the connected wallet's bech32 address for "My Tickets" queries
 - **tickets.ticket_number**: Required NOT NULL field; use `maybeSingle()` to find max, then increment
+- **tickets.listing_utxo_ref**: Stores UTxO reference (txHash#outputIndex) when ticket is listed for resale; required for cancel/purchase transactions
+- **tickets.resale_price**: Price in lovelace when listed; null when not listed
 - **ticket_tiers.remaining_supply**: Decremented on purchase; use RPC `decrement_tier_supply` or direct update fallback
 - **platform_config**: Singleton row (id='main') storing settings_policy_id and settings_utxo_ref
 
@@ -240,6 +252,11 @@ const result = await syncWalletTickets(lucid, userAddress);
 - `minted` → User owns ticket, it's in their wallet
 - `listed` → Ticket is on storefront for resale (set by `listTicketForResale`)
 - `transferred` → Ticket left wallet without proper DB update (caught by sync)
+
+**Resale Listing Visibility**:
+- Listed tickets appear in "My Tickets" with a "Listed for ₳X" badge (seller's view)
+- Listed tickets appear in "Resale" page for OTHER users only (query filters out `current_owner_address = userAddress`)
+- The ticket NFT is held at the Storefront contract address (escrow) while listed
 
 **When to sync**: Auto-syncs on TicketMarketplace load; manual sync button available.
 
