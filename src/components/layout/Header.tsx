@@ -22,14 +22,13 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
+  // Simplified navigation - organizer features consolidated into one area
   const tabs = [
     { id: 'setup', label: 'Setup', alwaysEnabled: true },
     { id: 'events', label: 'Events', requiresReady: true },
     { id: 'my-tickets', label: 'My Tickets', requiresReady: true },
     ...(isOrganizer ? [
-      { id: 'organizer', label: 'Organizer', requiresReady: true, isSecondary: true },
-      { id: 'venue-designer', label: 'Venue', requiresReady: true, isSecondary: true },
-      { id: 'settings', label: 'Settings', requiresReady: true, isSecondary: true },
+      { id: 'organizer', label: 'Organizer', requiresReady: true, isOrganizer: true },
     ] : []),
   ];
 
@@ -50,9 +49,10 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Navigation Tabs */}
       <nav className="flex items-center gap-1">
-        {tabs.filter(t => !t.isSecondary).map((tab) => {
+        {tabs.map((tab) => {
           const isDisabled = tab.requiresReady && !isPlatformReady;
-          const isActive = activeTab === tab.id;
+          const isActive = activeTab === tab.id ||
+            (tab.id === 'organizer' && ['organizer', 'venue-designer', 'settings'].includes(activeTab));
 
           return (
             <button
@@ -60,37 +60,14 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={() => !isDisabled && onTabChange(tab.id)}
               disabled={isDisabled}
               className={`
-                px-4 py-2 rounded-lg text-sm font-semibold transition-all
-                ${isActive
-                  ? 'bg-slate-900 text-white'
-                  : 'text-slate-600 hover:bg-slate-100'
-                }
-                ${isDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
-              `}
-            >
-              {tab.label}
-            </button>
-          );
-        })}
-
-        {/* Separator */}
-        <div className="w-px h-6 bg-slate-200 mx-2" />
-
-        {/* Secondary tabs (vendor/admin) */}
-        {tabs.filter(t => t.isSecondary).map((tab) => {
-          const isDisabled = tab.requiresReady && !isPlatformReady;
-          const isActive = activeTab === tab.id;
-
-          return (
-            <button
-              key={tab.id}
-              onClick={() => !isDisabled && onTabChange(tab.id)}
-              disabled={isDisabled}
-              className={`
-                px-3 py-1.5 rounded-lg text-xs font-medium transition-all
-                ${isActive
-                  ? 'bg-slate-700 text-white'
-                  : 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
+                px-4 py-2 rounded-lg text-sm font-medium transition-all
+                ${tab.isOrganizer
+                  ? isActive
+                    ? 'bg-purple-600 text-white'
+                    : 'text-purple-600 hover:bg-purple-50'
+                  : isActive
+                    ? 'bg-slate-900 text-white'
+                    : 'text-slate-600 hover:bg-slate-100'
                 }
                 ${isDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
               `}

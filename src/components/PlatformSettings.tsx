@@ -43,36 +43,18 @@ export const PlatformSettings: React.FC<PlatformSettingsProps> = ({ lucid, admin
       return;
     }
 
-    // First warning - explain what will happen
-    const firstConfirm = confirm(
-      '⚠️ WARNING: Reset & Re-initialize Settings\n\n' +
-      'This action will:\n' +
-      '1. BURN the existing Settings NFT on-chain\n' +
-      '2. Create a NEW Settings NFT with a new Policy ID\n\n' +
-      '❌ IMPORTANT: All existing events will become UNUSABLE!\n' +
-      'Events are tied to the settings policy ID. After reset, you must create new events.\n\n' +
-      'Do you want to continue?'
+    // Single clear confirmation
+    const confirmed = confirm(
+      '⚠️ BURN & RESET SETTINGS\n\n' +
+      'This will:\n' +
+      '• Burn the existing Settings NFT\n' +
+      '• Create a new Settings NFT\n' +
+      '• Make all existing events UNUSABLE\n\n' +
+      'You will need to approve 2 wallet transactions.\n\n' +
+      'Continue?'
     );
 
-    if (!firstConfirm) return;
-
-    // Second warning - final confirmation
-    const secondConfirm = confirm(
-      '🔥 FINAL CONFIRMATION\n\n' +
-      'You are about to permanently burn the Settings NFT.\n' +
-      'This requires TWO wallet signatures:\n' +
-      '  1. Burn the old Settings NFT\n' +
-      '  2. Mint the new Settings NFT\n\n' +
-      'Type "BURN" in the next prompt to confirm, or click Cancel to abort.'
-    );
-
-    if (!secondConfirm) return;
-
-    const burnConfirm = prompt('Type BURN to confirm:');
-    if (burnConfirm !== 'BURN') {
-      alert('Reset cancelled. You must type "BURN" exactly to proceed.');
-      return;
-    }
+    if (!confirmed) return;
 
     setReinitializing(true);
     setError(null);

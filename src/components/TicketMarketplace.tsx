@@ -60,6 +60,8 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [_lastSyncResult, setLastSyncResult] = useState<{ discovered: number; updated: number } | null>(null);
+  const [isListingMode, setIsListingMode] = useState(false);
+  const [listingPrice, setListingPrice] = useState('');
   const toast = useToast();
 
   const platformFeePercent = 2;
@@ -73,6 +75,12 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
       fee: fee,
       total: price + fee
     };
+  }, [selectedTicket]);
+
+  // Reset listing mode when ticket changes
+  useEffect(() => {
+    setIsListingMode(false);
+    setListingPrice('');
   }, [selectedTicket]);
 
   useEffect(() => {
@@ -164,10 +172,33 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
       setListings(formatTickets(listingsData || []));
 
       // WALLET-FIRST APPROACH for "My Tickets"
-      // Only show tickets that are actually in the user's wallet
+      // Show tickets in wallet + user's listed tickets (at storefront contract)
       if (lucid) {
         const walletNfts = await getWalletTicketNfts(lucid);
         console.log('TicketMarketplace: Wallet contains', walletNfts.length, 'ticket NFTs');
+
+        // Also get user's listed tickets (not in wallet, but user still "owns" them)
+        const { data: listedTickets, error: listedError } = await supabase
+          .from('tickets')
+          .select(`
+            *,
+            events (event_name, event_date, venue_name, event_policy_id),
+            ticket_tiers (tier_name, price_lovelace)
+          `)
+          .eq('status', 'listed')
+          .eq('current_owner_address', userAddress);
+
+        if (listedError) {
+          console.error('Listed tickets query failed:', listedError);
+        }
+        console.log('TicketMarketplace: User has', listedTickets?.length || 0, 'listed tickets');
+
+        let allMyTickets: Ticket[] = [];
+
+        // Add listed tickets first (formatted from DB)
+        if (listedTickets && listedTickets.length > 0) {
+          allMyTickets = [...formatTickets(listedTickets)];
+        }
 
         if (walletNfts.length > 0) {
           // Get the asset names of tickets in wallet
@@ -218,11 +249,15 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
             event_policy_id: nft.policyId,
           }));
 
-          setMyTickets([...formattedFromDb, ...formattedFromWallet]);
-        } else {
-          // No tickets in wallet
-          setMyTickets([]);
+          // Add wallet tickets (avoid duplicates with listed)
+          const listedAssetNames = new Set((listedTickets || []).map((t: any) => t.nft_asset_name));
+          const walletOnlyTickets = [...formattedFromDb, ...formattedFromWallet]
+            .filter(t => !listedAssetNames.has(t.nft_asset_name));
+
+          allMyTickets = [...allMyTickets, ...walletOnlyTickets];
         }
+
+        setMyTickets(allMyTickets);
       } else {
         // No lucid instance, fall back to DB query (shouldn't happen normally)
         const { data: myTicketsData } = await supabase
@@ -574,24 +609,76 @@ export const TicketMarketplace: React.FC<MarketplaceProps> = ({ lucid, userAddre
             {activeTab === 'my-tickets' && (
               <div className="space-y-3">
                 {selectedTicket.is_listed ? (
-                  <button
-                    onClick={() => handleCancelListing(selectedTicket)}
-                    disabled={isProcessing}
-                    className="w-full bg-red-500 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-red-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isProcessing ? 'Processing...' : 'Cancel Listing'}
-                  </button>
+                  <>
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-2">
+                      <p className="text-blue-800 font-semibold text-sm">Listed for Sale</p>
+                      <p className="text-blue-600 text-2xl font-black">₳{selectedTicket.resale_price}</p>
+                    </div>
+                    <button
+                      onClick={() => handleCancelListing(selectedTicket)}
+                      disabled={isProcessing}
+                      className="w-full bg-red-500 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-red-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isProcessing ? 'Processing...' : 'Cancel Listing'}
+                    </button>
+                  </>
+                ) : isListingMode ? (
+                  /* Listing Price Flyout */
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        Set Your Price
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">₳</span>
+                        <input
+                          type="number"
+                          min="1"
+                          step="0.01"
+                          value={listingPrice}
+                          onChange={(e) => setListingPrice(e.target.value)}
+                          placeholder="0.00"
+                          className="w-full pl-10 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-xl text-2xl font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          autoFocus
+                        />
+                      </div>
+                      <p className="text-xs text-slate-400 mt-2">
+                        Max: ₳{(selectedTicket.original_price * 3).toFixed(2)} (3x original)
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        const price = parseFloat(listingPrice);
+                        if (price > 0) {
+                          handleListTicketForSale(selectedTicket, price);
+                          setIsListingMode(false);
+                          setListingPrice('');
+                        }
+                      }}
+                      disabled={isProcessing || !listingPrice || parseFloat(listingPrice) <= 0}
+                      className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isProcessing ? 'Processing...' : 'Confirm Listing'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsListingMode(false);
+                        setListingPrice('');
+                      }}
+                      className="w-full bg-slate-200 text-slate-700 py-3 rounded-xl font-medium hover:bg-slate-300 transition-all"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 ) : (
                   <>
                     <button
-                      onClick={() => {
-                        const price = prompt('List price (ADA):');
-                        if (price) handleListTicketForSale(selectedTicket, parseFloat(price));
-                      }}
+                      onClick={() => setIsListingMode(true)}
                       disabled={isProcessing}
                       className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-lg hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {isProcessing ? 'Processing...' : 'List for Sale'}
+                      List for Sale
                     </button>
                     <button
                       onClick={() => {

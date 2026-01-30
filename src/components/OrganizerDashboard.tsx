@@ -271,6 +271,23 @@ export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ lucid, u
     );
   }
 
+  // Handle event created - navigate to it
+  const handleEventCreated = async (eventId: string) => {
+    // Refresh the events list
+    await loadEvents();
+    // Switch back to events view
+    setActiveView('events');
+    // Find and select the new event
+    const { data: newEvent } = await supabase
+      .from('events')
+      .select(`*, ticket_tiers (*)`)
+      .eq('id', eventId)
+      .single();
+    if (newEvent) {
+      setSelectedEvent(newEvent);
+    }
+  };
+
   // Show Create Event view
   if (activeView === 'create') {
     return (
@@ -296,7 +313,11 @@ export const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ lucid, u
 
         {/* Create Event Form */}
         <div className="flex-1 overflow-y-auto">
-          <CreateEvent lucid={lucid} walletAddress={userAddress} />
+          <CreateEvent
+            lucid={lucid}
+            walletAddress={userAddress}
+            onEventCreated={handleEventCreated}
+          />
         </div>
       </div>
     );

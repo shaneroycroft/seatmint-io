@@ -7,6 +7,7 @@ import { useToast, TOAST_MESSAGES } from '../contexts/ToastContext';
 interface CreateEventProps {
   lucid: any;
   walletAddress: string;
+  onEventCreated?: (eventId: string) => void;
 }
 
 interface Venue {
@@ -59,7 +60,7 @@ const getMinDateTime = () => {
   return now.toISOString().slice(0, 16);
 };
 
-export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: _walletAddress }) => {
+export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: _walletAddress, onEventCreated }) => {
   const toast = useToast();
   const [formData, setFormData] = useState({
     eventName: '',
@@ -249,6 +250,11 @@ export const CreateEvent: React.FC<CreateEventProps> = ({ lucid, walletAddress: 
       console.log('Event created:', result);
       setSuccess(true);
       toast.success(TOAST_MESSAGES.eventCreated.title, `${formData.eventName} is ready! You can now publish it.`);
+
+      // Notify parent to navigate to the new event
+      if (onEventCreated) {
+        onEventCreated(result.eventId);
+      }
     } catch (err) {
       setTxStatus('error');
       const errorMessage = err instanceof Error ? err.message : 'Failed to create event';
